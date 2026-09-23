@@ -82,6 +82,7 @@ namespace VenueManager
     public List<Service> availableServices = new();
     public bool xivAppInventoryEnabled = false;
     public List<BannedPatron> xivAppBannedPatrons = new();
+    public bool xivAppBannedPatronsUnavailable = false;
     public string? currentXivAppVenueId;
 
     // Gates patron-visit sync for "sync only during events" — see ARCHITECTURE.md § Patron sync & chat alerts
@@ -132,7 +133,9 @@ namespace VenueManager
         availableServices = servicesResp?.Services ?? new List<Service>();
         Log.Information("Auto-loaded {Count} service(s) for venue {VenueId}", availableServices.Count, target.Id);
 
-        xivAppBannedPatrons = await xivAppClient.Venue.GetBannedPatronsAsync(target.Id);
+        var bannedPatrons = await xivAppClient.Venue.GetBannedPatronsAsync(target.Id);
+        xivAppBannedPatrons = bannedPatrons ?? new List<BannedPatron>();
+        xivAppBannedPatronsUnavailable = bannedPatrons == null;
         Log.Information("Auto-loaded {Count} banned patron(s) for venue {VenueId}", xivAppBannedPatrons.Count, target.Id);
 
         xivAppInventoryEnabled = await xivAppClient.Venue.GetInventoryEnabledAsync(target.Id);
@@ -908,7 +911,9 @@ namespace VenueManager
       {
         try
         {
-          xivAppBannedPatrons = await xivAppClient.Venue.GetBannedPatronsAsync(venueId);
+          var bannedPatrons = await xivAppClient.Venue.GetBannedPatronsAsync(venueId);
+          if (bannedPatrons != null) xivAppBannedPatrons = bannedPatrons;
+          xivAppBannedPatronsUnavailable = bannedPatrons == null;
         }
         catch (Exception ex)
         {

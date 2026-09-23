@@ -753,8 +753,9 @@ public class SettingsTab : ITab
       if (plugin.xivAppClient == null || !plugin.xivAppClient.IsConfigured) return;
 
       var bannedPatrons = await plugin.xivAppClient.Venue.GetBannedPatronsAsync(venueId);
-      plugin.xivAppBannedPatrons = bannedPatrons;
-      Plugin.Log.Information("Fetched {Count} banned patron(s) for venue {VenueId}", bannedPatrons.Count, venueId);
+      if (bannedPatrons != null) plugin.xivAppBannedPatrons = bannedPatrons;
+      plugin.xivAppBannedPatronsUnavailable = bannedPatrons == null;
+      Plugin.Log.Information("Fetched {Count} banned patron(s) for venue {VenueId}", plugin.xivAppBannedPatrons.Count, venueId);
     } catch (Exception ex) {
       Plugin.Log.Error("Failed to fetch banned patrons: {0}", ex.Message);
     }

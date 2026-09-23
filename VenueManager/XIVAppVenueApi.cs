@@ -59,11 +59,11 @@ namespace VenueManager
         new List<Role>(),
         "get roles");
 
-    public Task<List<BannedPatron>> GetBannedPatronsAsync(string venueId) =>
-      _client.GetAsync<BannedPatronsResponse, List<BannedPatron>>(
+    public Task<List<BannedPatron>?> GetBannedPatronsAsync(string venueId) =>
+      _client.GetAsync<BannedPatronsResponse, List<BannedPatron>?>(
         $"/api/plugin/patrons/banned?venueId={venueId}",
         r => r?.BannedPatrons ?? new List<BannedPatron>(),
-        new List<BannedPatron>(),
+        null,
         "get banned patrons");
 
     public Task<ActiveEventResponse?> GetActiveEventAsync(string venueId) =>
