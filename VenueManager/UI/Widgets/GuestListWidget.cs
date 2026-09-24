@@ -43,6 +43,9 @@ public class GuestListWidget
       }
     }
 
+    if (plugin.xivAppBannedPatronsUnavailable) {
+      ImGui.TextColored(VenueManager.UI.Colors.XivRed, "⚠ Ban list unavailable. Open xivvenuemanager.com once to reconnect.");
+    }
     drawOptions(houseId);
     drawGuestTable(houseId);
   }
