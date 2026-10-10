@@ -36,6 +36,14 @@
     <DefineConstants>BETA;TRACE</DefineConstants>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Flavour)' == 'Dev'">
+    <AssemblyName>XIVVenueManagerSyncDev</AssemblyName>
+    <Title>XIV Venue Manager Sync (Dev)</Title>
+    <DefineConstants>$(DefineConstants);DEV_FLAVOUR</DefineConstants>
+    <OutputPath>bin/x64/Release-Dev/</OutputPath>
+    <IntermediateOutputPath>obj/x64/Release-Dev/</IntermediateOutputPath>
+  </PropertyGroup>
+
   <ItemGroup>
     <Content Include="..\images\icon.png">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

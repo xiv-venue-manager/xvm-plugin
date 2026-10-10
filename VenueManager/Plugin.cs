@@ -28,9 +28,17 @@ namespace VenueManager
 {
   public sealed class Plugin : IDalamudPlugin
   {
+#if DEV_FLAVOUR
+    public string Name => "XIV Venue Manager Sync (Dev)";
+    private const string CommandName = "/xvdev";
+    private const string CommandNameAlias = "/xvmdev";
+    private const string DtrName = "XIV Venue Manager (Dev)";
+#else
     public string Name => "XIV Venue Manager Sync";
     private const string CommandName = "/xvenue";
     private const string CommandNameAlias = "/xvm";
+    private const string DtrName = "XIV Venue Manager";
+#endif
     [PluginService] public static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
     [PluginService] public static IClientState ClientState { get; private set; } = null!;
     [PluginService] public static IFramework Framework { get; private set; } = null!;
@@ -326,7 +334,7 @@ namespace VenueManager
       // Always instantiated so the Settings tab can lazy-configure it on paste — see ARCHITECTURE.md § Startup/configuration
       xivAppClient = new XIVAppApiClient();
       if (!string.IsNullOrEmpty(Configuration.xvmApiSecret))
-          xivAppClient.ConfigureXvm(Configuration.xvmApiUrl, Configuration.xvmApiSecret);
+          xivAppClient.ConfigureXvm(XvmApiPairing.ResolveUrl(Configuration.xvmApiUrl), Configuration.xvmApiSecret);
       if (xivAppClient.IsConfigured)
       {
           // Fire-and-forget: a server outage at launch must not block plugin init
@@ -378,7 +386,7 @@ namespace VenueManager
       // Always created; visibility driven by display-mode config, not Get/Remove churn
       try
       {
-        dtrEntry = DtrBar.Get("XIV Venue Manager");
+        dtrEntry = DtrBar.Get(DtrName);
         dtrEntry.OnClick = _ => MainWindow.Toggle();
         dtrEntry.Tooltip = "XIV Venue Manager — click to open";
         dtrEntry.Shown = Configuration.dtrDisplayMode != DtrDisplayMode.Disabled;

@@ -177,3 +177,31 @@ public class XvmApiPairingTests
         Assert.Empty(handler.Requests);
     }
 }
+
+public class XvmApiResolveUrlTests
+{
+  [Theory]
+  [InlineData(null)]
+  [InlineData("")]
+  [InlineData("https://api.xivvenuemanager.com")]
+  [InlineData("https://api.xivvenuemanager.com/")]
+  [InlineData("https://xivvenuemanager.com")]
+  [InlineData("http://192.168.1.122:8000")]
+  [InlineData("not a url")]
+  public void DevNeverResolvesToProd(string? configured)
+    => Assert.Equal(XvmApiPairing.DevUrl, XvmApiPairing.ResolveUrl(configured, dev: true));
+
+  [Theory]
+  [InlineData("https://dev-api.xivvenuemanager.com/", "https://dev-api.xivvenuemanager.com")]
+  [InlineData("http://localhost:8001", "http://localhost:8001")]
+  [InlineData("http://100.80.129.7:8001", "http://100.80.129.7:8001")]
+  public void DevKeepsAllowedHosts(string configured, string expected)
+    => Assert.Equal(expected, XvmApiPairing.ResolveUrl(configured, dev: true));
+
+  [Fact]
+  public void ReleaseKeepsConfiguredUrlAndDefaultsToProd()
+  {
+    Assert.Equal(XvmApiPairing.ProdUrl, XvmApiPairing.ResolveUrl("", dev: false));
+    Assert.Equal("http://localhost:8001", XvmApiPairing.ResolveUrl("http://localhost:8001/", dev: false));
+  }
+}

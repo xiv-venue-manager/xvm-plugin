@@ -689,7 +689,7 @@ public class SettingsTab : ITab
     linkStatusColor = StatusWarn;
     try
     {
-      var url = string.IsNullOrWhiteSpace(this.configuration.xvmApiUrl) ? XvmApiPairing.DefaultUrl : this.configuration.xvmApiUrl;
+      var url = XvmApiPairing.ResolveUrl(this.configuration.xvmApiUrl);
       var result = await XvmApiPairing.LinkAsync(XvmHttp, url, pairingCode);
       if (result.Success)
       {
