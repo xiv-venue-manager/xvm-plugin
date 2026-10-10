@@ -1095,9 +1095,10 @@ namespace VenueManager
                       "Occupied" => $"Room {pluginState.currentHouse.room}: Occupied",
                       "Locked" => $"Room {pluginState.currentHouse.room}: Locked",
                       "Disabled" => $"Room {pluginState.currentHouse.room}: Disabled",
-                      _ => $"Room {pluginState.currentHouse.room}: Free - open plugin to reserve",
+                      _ when MainWindow.Instance?.RoomsLoaded == true => $"Room {pluginState.currentHouse.room}: not set up for this venue",
+                      _ => null,
                     };
-                    Chat.Print($"[{Name}] {msg}");
+                    if (msg != null) Chat.Print($"[{Name}] {msg}");
                   }
                 }
 

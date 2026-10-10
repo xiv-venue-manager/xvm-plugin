@@ -174,6 +174,8 @@ public class RoomsTab : ITab
     }
   }
 
+  public bool HasLoaded => lastFetch != DateTime.MinValue;
+
   public string GetRoomStatus(int roomNumber)
   {
     var room = rooms.FirstOrDefault(r => r.RoomNumber == roomNumber);
