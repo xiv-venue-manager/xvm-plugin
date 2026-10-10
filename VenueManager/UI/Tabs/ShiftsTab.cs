@@ -296,7 +296,7 @@ public class ShiftsTab : ITab
 
     try
     {
-      var result = await plugin.xivAppClient.Shift.ClaimShiftAsync(plugin.currentXivAppVenueId, shiftId);
+      var result = await plugin.xivAppClient.Shift.ClaimShiftAsync(plugin.currentXivAppVenueId ?? "", shiftId);
       if (result.Success)
       {
         statusMessage = result.Merged
@@ -338,7 +338,7 @@ public class ShiftsTab : ITab
 
     try
     {
-      var result = await plugin.xivAppClient.Shift.ClockInAsync(shiftId);
+      var result = await plugin.xivAppClient.Shift.ClockInAsync(plugin.currentXivAppVenueId ?? "", shiftId);
       if (result.Success)
       {
         statusMessage = "Clocked in!";
@@ -379,7 +379,7 @@ public class ShiftsTab : ITab
 
     try
     {
-      var result = await plugin.xivAppClient.Shift.ClockOutAsync(shiftId);
+      var result = await plugin.xivAppClient.Shift.ClockOutAsync(plugin.currentXivAppVenueId ?? "", shiftId);
       if (result.Success)
       {
         string hours = result.HoursWorked.HasValue
