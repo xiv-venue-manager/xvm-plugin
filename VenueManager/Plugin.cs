@@ -1471,11 +1471,6 @@ namespace VenueManager
 
       if (this.Configuration.showPluginNameInChat) messageBuilder.AddText($"[{Name}] ");
 
-      if (isBannedPatron(player))
-      {
-        messageBuilder.AddText("⚠ BANNED ");
-      }
-
       messageBuilder.AddUiForeground(Colors.getChatColor(player, true));
 
       messageBuilder.Add(new PlayerPayload(player.Name, player.homeWorld));
