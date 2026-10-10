@@ -1300,6 +1300,22 @@ namespace VenueManager
           SendGameChat($"/tell {player.Name}@{player.WorldName} {Configuration.reentryGreeterMessage}");
       }
 
+      if (Configuration.alertBannedPatrons && isBannedPatron(player))
+      {
+        var banned = xivAppBannedPatrons.First(v => v.CharacterName == player.Name && v.World == player.WorldName);
+        var alert = new SeStringBuilder();
+        if (this.Configuration.showPluginNameInChat) alert.AddText($"[{Name}] ");
+        alert.AddText("⚠ BANNED ");
+        alert.AddUiForeground(Colors.getChatColor(player, true));
+        alert.Add(new PlayerPayload(player.Name, player.homeWorld));
+        alert.AddUiForegroundOff();
+        alert.AddText(justEnteredHouse ? " is already inside " : " has entered ");
+        alert.AddText(venueList.venues[pluginState.currentHouse.houseId].name);
+        if (!string.IsNullOrEmpty(banned.Reason)) alert.AddText($" ({banned.Reason})");
+        Chat.Print(new XivChatEntry() { Message = alert.Build() });
+        return;
+      }
+
       if (pluginState.snoozed) return;
       if (!Configuration.showChatAlerts) return;
 

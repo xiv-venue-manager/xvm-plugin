@@ -151,7 +151,7 @@ public static class ThemeManager
     {
         if (plugin.xivAppClient == null || !plugin.xivAppClient.IsConfigured)
         {
-            ConfigBanner(notConfiguredMessage ?? "XIV-App is not configured. Add your API key in Settings.");
+            ConfigBanner(notConfiguredMessage ?? "Your account is not linked. Link it under Account link in Settings.");
             return false;
         }
         if (string.IsNullOrEmpty(plugin.currentXivAppVenueId))

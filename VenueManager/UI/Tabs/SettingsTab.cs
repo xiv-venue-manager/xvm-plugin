@@ -80,6 +80,9 @@ public class SettingsTab : ITab
     DrawPatronListSettings();
 
     DrawSectionSeparator();
+    DrawBanAlerts();
+
+    DrawSectionSeparator();
     DrawPatronChatAlerts();
 
     DrawSectionSeparator();
@@ -231,6 +234,21 @@ public class SettingsTab : ITab
   }
 
   // -- Chat Alerts ----------------------------------------------------------
+
+  private void DrawBanAlerts()
+  {
+    DrawSectionHeader("Ban Alerts");
+    var alertBanned = this.configuration.alertBannedPatrons;
+    if (ImGui.Checkbox("Alert when a banned patron arrives", ref alertBanned))
+    {
+      this.configuration.alertBannedPatrons = alertBanned;
+      this.configuration.Save();
+    }
+    if (ImGui.IsItemHovered())
+    {
+      ImGui.SetTooltip("Shows a chat warning with the ban reason. Works even if chat alerts, snooze or the Patrons tab are turned off.");
+    }
+  }
 
   private void DrawPatronChatAlerts()
   {

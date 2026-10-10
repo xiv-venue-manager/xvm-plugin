@@ -62,6 +62,7 @@ public class MainWindow : Window, IDisposable
             new GuestLogTab(plugin),
             new ShiftsTab(plugin),
             roomsTab,
+            new BansTab(plugin),
             new InventoryTab(plugin),
             new VenuesTab(plugin),
             settingsTab,
