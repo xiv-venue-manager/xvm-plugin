@@ -182,6 +182,30 @@ namespace VenueManager
       if (changed) Configuration.Save();
     }
 
+    private async Task AnnounceChamberAsync(int roomNumber, Task follow)
+    {
+      try
+      {
+        await follow;
+        var venueId = currentXivAppVenueId;
+        if (xivAppClient == null || string.IsNullOrEmpty(venueId)) return;
+        var room = (await xivAppClient.Venue.GetRoomsAsync(venueId)).FirstOrDefault(r => r.RoomNumber == roomNumber);
+        var status = room switch
+        {
+          null => "not set up for this venue",
+          { Disabled: true } => "Disabled",
+          { Locked: true } => "Locked",
+          { IsOccupied: true } => "Occupied",
+          _ => "Free - open plugin to reserve",
+        };
+        Chat.Print($"[{Name}] Room {roomNumber}: {status}");
+      }
+      catch (Exception ex)
+      {
+        Log.Warning("Announcing the chamber failed: {0}", ex.Message);
+      }
+    }
+
     private async Task FollowHouseToVenueAsync()
     {
       try
@@ -197,15 +221,18 @@ namespace VenueManager
             venueId = VenueAddressMatcher.FindUnique(AddressOf(house), xivAppVenueAddresses);
           }
           if (venueId is null) return;
-          Configuration.houseToXivAppVenue[house.houseId] = venueId;
-          if (!venueList.venues.ContainsKey(house.houseId))
+          if (house.room == 0 || house.plot <= 0)
           {
-            var saved = new Venue(house) { name = xivAppVenues.FirstOrDefault(v => v.Id == venueId)?.Name ?? house.name };
-            venueList.venues.Add(saved.houseId, saved);
-            venueList.save();
+            Configuration.houseToXivAppVenue[house.houseId] = venueId;
+            if (!venueList.venues.ContainsKey(house.houseId))
+            {
+              var saved = new Venue(house) { name = xivAppVenues.FirstOrDefault(v => v.Id == venueId)?.Name ?? house.name };
+              venueList.venues.Add(saved.houseId, saved);
+              venueList.save();
+            }
+            Configuration.Save();
+            Log.Information("Recognised house {House} as venue {Venue} by address", house.houseId, venueId);
           }
-          Configuration.Save();
-          Log.Information("Recognised house {House} as venue {Venue} by address", house.houseId, venueId);
         }
 
         if (venueId == currentXivAppVenueId) return;
@@ -1152,7 +1179,7 @@ namespace VenueManager
                 pluginState.currentHouse.type = (ushort)HousingManager.GetOriginalHouseTerritoryTypeId();
                 pluginState.currentHouse.district = TerritoryUtils.getDistrict(pluginState.currentHouse.type);
                 pluginState.currentHouse.worldId = currentWorldId;
-                _ = FollowHouseToVenueAsync();
+                var follow = FollowHouseToVenueAsync();
 
                 // Auto-open Rooms tab when entering a private chamber (a plot with room > 0, not an apartment)
                 if (pluginState.currentHouse.room > 0 && pluginState.currentHouse.plot > 0 && previousRoom != pluginState.currentHouse.room)
@@ -1161,19 +1188,7 @@ namespace VenueManager
                   if (!MainWindow.IsOpen)
                     MainWindow.IsOpen = true;
                   else
-                  {
-                    var status = MainWindow.Instance?.GetRoomStatus(pluginState.currentHouse.room) ?? "";
-                    var msg = status switch
-                    {
-                      "Free" => $"Room {pluginState.currentHouse.room}: Free - open plugin to reserve",
-                      "Occupied" => $"Room {pluginState.currentHouse.room}: Occupied",
-                      "Locked" => $"Room {pluginState.currentHouse.room}: Locked",
-                      "Disabled" => $"Room {pluginState.currentHouse.room}: Disabled",
-                      _ when MainWindow.Instance?.RoomsLoaded == true => $"Room {pluginState.currentHouse.room}: not set up for this venue",
-                      _ => null,
-                    };
-                    if (msg != null) Chat.Print($"[{Name}] {msg}");
-                  }
+                    _ = AnnounceChamberAsync(pluginState.currentHouse.room, follow);
                 }
 
                 if (venueList.venues.ContainsKey(pluginState.currentHouse.houseId))

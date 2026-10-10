@@ -174,18 +174,6 @@ public class RoomsTab : ITab
     }
   }
 
-  public bool HasLoaded => lastFetch != DateTime.MinValue;
-
-  public string GetRoomStatus(int roomNumber)
-  {
-    var room = rooms.FirstOrDefault(r => r.RoomNumber == roomNumber);
-    if (room == null) return "";
-    if (room.Disabled) return "Disabled";
-    if (room.Locked) return "Locked";
-    if (room.IsOccupied) return "Occupied";
-    return "Free";
-  }
-
   private async Task ReserveRoomAsync(Room room, int durationMinutes)
   {
     if (plugin.xivAppClient == null || string.IsNullOrEmpty(plugin.currentXivAppVenueId)) return;
