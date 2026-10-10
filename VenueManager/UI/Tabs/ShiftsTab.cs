@@ -296,7 +296,7 @@ public class ShiftsTab : ITab
 
     try
     {
-      var result = await plugin.xivAppClient.Shift.ClaimShiftAsync(shiftId);
+      var result = await plugin.xivAppClient.Shift.ClaimShiftAsync(plugin.currentXivAppVenueId, shiftId);
       if (result.Success)
       {
         statusMessage = result.Merged

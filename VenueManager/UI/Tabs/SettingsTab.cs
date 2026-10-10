@@ -504,6 +504,7 @@ public class SettingsTab : ITab
         this.configuration.xvmApiSecret = "";
         this.configuration.xvmApiPersonName = "";
         this.configuration.Save();
+        plugin.xivAppClient?.ClearXvm();
         linkStatus = "";
       }
       ImGui.Spacing();
@@ -534,8 +535,10 @@ public class SettingsTab : ITab
         this.configuration.xvmApiSecret = result.Secret!;
         this.configuration.xvmApiPersonName = result.PersonName ?? "";
         this.configuration.Save();
+        plugin.xivAppClient?.ConfigureXvm(url, result.Secret!);
         pairingCode = "";
         linkStatus = "";
+        _ = FetchXivAppVenuesAsync();
       }
       else
       {
@@ -762,7 +765,7 @@ public class SettingsTab : ITab
       }
       if (!plugin.xivAppClient.IsConfigured)
       {
-        xivAppStatus = "Enter your API key first (generate one at xivvenuemanager.com).";
+        xivAppStatus = "Link your account first: Account link above.";
         xivAppStatusColor = StatusWarn;
         return;
       }
@@ -779,6 +782,13 @@ public class SettingsTab : ITab
         xivAppStatusColor = StatusWarn;
         return;
       }
+
+      var known = plugin.xivAppVenues.Select(v => v.Id).ToHashSet();
+      if (!string.IsNullOrEmpty(this.configuration.selectedVenueId) && !known.Contains(this.configuration.selectedVenueId))
+        this.configuration.selectedVenueId = "";
+      foreach (var stale in this.configuration.houseToXivAppVenue.Where(kv => !known.Contains(kv.Value)).Select(kv => kv.Key).ToList())
+        this.configuration.houseToXivAppVenue.Remove(stale);
+      this.configuration.Save();
 
       xivAppStatus = $"✓ Fetched {plugin.xivAppVenues.Count} venue(s)";
       xivAppStatusColor = StatusOk;

@@ -50,7 +50,39 @@ namespace VenueManager
       }
     }
 
-    public bool IsConfigured => !string.IsNullOrEmpty(_apiKey) && !string.IsNullOrEmpty(BaseUrl);
+    private static readonly HttpClient XvmHttp = new() { Timeout = TimeSpan.FromSeconds(10) };
+
+    internal XvmApiReads? Xvm { get; private set; }
+
+    internal XvmApiWrites? XvmWrites { get; private set; }
+
+    public bool IsXvmLinked => Xvm is not null;
+
+    public void ConfigureXvm(string url, string secret)
+    {
+      var linked = !string.IsNullOrWhiteSpace(secret);
+      Xvm = linked ? new XvmApiReads(XvmHttp, url, secret) : null;
+      XvmWrites = linked ? new XvmApiWrites(XvmHttp, url, secret) : null;
+    }
+
+    public void ClearXvm() => ConfigureXvm("", "");
+
+    private bool LegacyConfigured => !string.IsNullOrEmpty(_apiKey) && !string.IsNullOrEmpty(BaseUrl);
+
+    public bool IsConfigured => LegacyConfigured || IsXvmLinked;
+
+    internal async Task<T> SafelyAsync<T>(Func<Task<T>> call, T fallback, string errorContext)
+    {
+      try
+      {
+        return await call();
+      }
+      catch (Exception ex)
+      {
+        Plugin.Log.Warning($"Failed to {errorContext}: {ex.Message}");
+        return fallback;
+      }
+    }
 
     /// <summary>
     /// GET a JSON response and extract a result from it, returning
@@ -64,7 +96,7 @@ namespace VenueManager
       TResult fallback,
       string errorContext)
     {
-      if (!IsConfigured) return fallback;
+      if (!LegacyConfigured) return fallback;
       try
       {
         var response = await Http.GetAsync($"{BaseUrl}{path}");
@@ -98,7 +130,7 @@ namespace VenueManager
       Func<string, TResult> onFailure,
       Func<HttpContent, Task<TResult>> onSuccess)
     {
-      if (!IsConfigured) return notConfigured();
+      if (!LegacyConfigured) return notConfigured();
       try
       {
         var response = await Http.PostAsJsonAsync($"{BaseUrl}{path}", request);

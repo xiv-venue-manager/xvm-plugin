@@ -173,11 +173,15 @@ namespace VenueManager
 
       // Always instantiated so the Settings tab can lazy-configure it on paste — see ARCHITECTURE.md § Startup/configuration
       xivAppClient = new XIVAppApiClient();
+      if (!string.IsNullOrEmpty(Configuration.xvmApiSecret))
+          xivAppClient.ConfigureXvm(Configuration.xvmApiUrl, Configuration.xvmApiSecret);
       if (!string.IsNullOrEmpty(Configuration.xivAppApiKey))
       {
           xivAppClient.Configure(Configuration.xivAppApiKey, Configuration.xivAppServerUrl);
           Log.Information("XIV-App API Client configured with server: {0}", Configuration.xivAppServerUrl);
-
+      }
+      if (xivAppClient.IsConfigured)
+      {
           // Fire-and-forget: a server outage at launch must not block plugin init
           _ = AutoLoadXivAppDataAsync();
       }
@@ -576,7 +580,7 @@ namespace VenueManager
             return;
           }
 
-          var result = await xivAppClient.Shift.ClockInAsync(scheduled.Id);
+          var result = await xivAppClient.Shift.ClockInAsync(currentXivAppVenueId, scheduled.Id);
           if (result.Success)
           {
             Chat.Print(prefix + "Clocked in. Shift is now active.");
@@ -611,7 +615,7 @@ namespace VenueManager
             return;
           }
 
-          var result = await xivAppClient.Shift.ClockOutAsync(active.Id);
+          var result = await xivAppClient.Shift.ClockOutAsync(currentXivAppVenueId, active.Id);
           if (result.Success)
           {
             var hoursMsg = result.HoursWorked.HasValue
