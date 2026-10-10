@@ -79,6 +79,7 @@ namespace VenueManager
     public XIVAppApiClient? xivAppClient;
     public List<XIVAppVenue> xivAppVenues = new();
     internal List<XvmVenueAddress> xivAppVenueAddresses = new();
+    private DateTime venueAddressesLoadedAt = DateTime.MinValue;
     public List<Role> xivAppRoles = new();
     public List<Service> availableServices = new();
     public bool xivAppInventoryEnabled = false;
@@ -157,6 +158,7 @@ namespace VenueManager
       try
       {
         xivAppVenueAddresses = await xvm.GetVenueAddressesAsync(xivAppVenues.Select(v => v.Id));
+        venueAddressesLoadedAt = DateTime.UtcNow;
         AutoLinkSavedHouses();
       }
       catch (Exception ex)
@@ -189,6 +191,11 @@ namespace VenueManager
         if (!Configuration.houseToXivAppVenue.TryGetValue(house.houseId, out var venueId) || string.IsNullOrEmpty(venueId))
         {
           venueId = VenueAddressMatcher.FindUnique(AddressOf(house), xivAppVenueAddresses);
+          if (venueId is null && DateTime.UtcNow - venueAddressesLoadedAt > TimeSpan.FromSeconds(60))
+          {
+            await LoadVenueAddressesAsync();
+            venueId = VenueAddressMatcher.FindUnique(AddressOf(house), xivAppVenueAddresses);
+          }
           if (venueId is null) return;
           Configuration.houseToXivAppVenue[house.houseId] = venueId;
           if (!venueList.venues.ContainsKey(house.houseId))
@@ -1147,8 +1154,8 @@ namespace VenueManager
                 pluginState.currentHouse.worldId = currentWorldId;
                 _ = FollowHouseToVenueAsync();
 
-                // Auto-open Rooms tab when entering a private chamber (room > 0)
-                if (pluginState.currentHouse.room > 0 && previousRoom != pluginState.currentHouse.room)
+                // Auto-open Rooms tab when entering a private chamber (a plot with room > 0, not an apartment)
+                if (pluginState.currentHouse.room > 0 && pluginState.currentHouse.plot > 0 && previousRoom != pluginState.currentHouse.room)
                 {
                   MainWindow.OpenTab("Rooms");
                   if (!MainWindow.IsOpen)
