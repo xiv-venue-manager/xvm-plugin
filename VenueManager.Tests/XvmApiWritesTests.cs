@@ -87,7 +87,7 @@ public class XvmApiWritesTests
         var handler = new Handler()
             .On("GET", "/venues/v1/events/active", "{\"id\":9,\"title\":\"Friday\"}")
             .On("POST", "/venues/v1/finance/transactions", "{\"id\":5,\"service_id\":11}", HttpStatusCode.Created)
-            .On("GET", "/venues/v1/services/11/inventory", "{\"stock_count\":7}");
+            .On("GET", "/venues/v1/services/11", "{\"id\":11,\"inventory\":{\"stock_count\":7}}");
 
         var result = await Writes(handler).LogTransactionAsync("v1", "11", 1500, "Guest", null, null);
 

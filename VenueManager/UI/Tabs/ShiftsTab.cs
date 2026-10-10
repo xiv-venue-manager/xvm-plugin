@@ -153,13 +153,14 @@ public class ShiftsTab : ITab
     ImGui.SameLine();
     ImGui.SetCursorPosX(rightEdge - btnWidth);
 
-    if (clocking) ImGui.BeginDisabled();
+    bool disabled = clocking;
+    if (disabled) ImGui.BeginDisabled();
     using (ThemeManager.PrimaryButton())
     {
       if (ImGui.SmallButton(btnLabel))
         _ = ClaimAsync(shift.Id);
     }
-    if (clocking) ImGui.EndDisabled();
+    if (disabled) ImGui.EndDisabled();
 
     ImGui.Spacing();
   }
@@ -238,13 +239,14 @@ public class ShiftsTab : ITab
       ImGui.SameLine();
       ImGui.SetCursorPosX(rightEdge - btnWidth);
 
-      if (clocking) ImGui.BeginDisabled();
+      bool disabled = clocking;
+      if (disabled) ImGui.BeginDisabled();
       using (ThemeManager.PrimaryButton())
       {
         if (ImGui.SmallButton(btnLabel))
           _ = ClockOutAsync(shift.Id);
       }
-      if (clocking) ImGui.EndDisabled();
+      if (disabled) ImGui.EndDisabled();
     }
     else if (shift.Status == "COMPLETED"
           && DateTime.TryParse(shift.ActualStart, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var completedStartUtc)

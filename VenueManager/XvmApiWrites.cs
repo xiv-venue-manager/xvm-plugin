@@ -107,8 +107,8 @@ namespace VenueManager
       var result = new LogTransactionResult { Success = true, ServiceId = serviceId };
       if (serviceKey is not null && kind == "sale")
       {
-        var stock = await SendAsync(HttpMethod.Get, $"{Venue(venueId)}/services/{serviceKey}/inventory");
-        if (stock.Ok) result.ServiceStockCount = Read<XvmStockReply>(stock.Body)?.StockCount;
+        var stock = await SendAsync(HttpMethod.Get, $"{Venue(venueId)}/services/{serviceKey}");
+        if (stock.Ok) result.ServiceStockCount = Read<XvmServiceStockReply>(stock.Body)?.Inventory?.StockCount;
       }
       return result;
     }

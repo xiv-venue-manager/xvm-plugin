@@ -50,6 +50,9 @@ namespace VenueManager
   internal sealed record XvmMePerson(
     [property: JsonPropertyName("id")] int Id);
 
+  internal sealed record XvmServiceStockReply(
+    [property: JsonPropertyName("inventory")] XvmStockReply? Inventory);
+
   internal sealed record XvmStockReply(
     [property: JsonPropertyName("stock_count")] int? StockCount);
 }
