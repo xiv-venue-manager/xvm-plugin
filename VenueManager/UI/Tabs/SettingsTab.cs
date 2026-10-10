@@ -705,6 +705,7 @@ public class SettingsTab : ITab
 
       plugin.xivAppVenues = await plugin.xivAppClient.Venue.GetVenuesAsync();
       Plugin.Log.Information("Fetched {Count} venues from XIV-App", plugin.xivAppVenues.Count);
+      await plugin.LoadVenueAddressesAsync();
 
       if (plugin.xivAppVenues.Count == 0)
       {

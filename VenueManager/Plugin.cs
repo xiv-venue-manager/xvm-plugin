@@ -78,6 +78,7 @@ namespace VenueManager
     // Public so UI tabs can access the same client instance directly
     public XIVAppApiClient? xivAppClient;
     public List<XIVAppVenue> xivAppVenues = new();
+    internal List<XvmVenueAddress> xivAppVenueAddresses = new();
     public List<Role> xivAppRoles = new();
     public List<Service> availableServices = new();
     public bool xivAppInventoryEnabled = false;
@@ -114,6 +115,7 @@ namespace VenueManager
         xivAppVenues = await xivAppClient.Venue.GetVenuesAsync();
         Log.Information("Auto-loaded {Count} venue(s) on startup", xivAppVenues.Count);
         if (xivAppVenues.Count == 0) return;
+        await LoadVenueAddressesAsync();
 
         // Mirrors the manual Fetch button's selection logic
         var preferred = xivAppVenues.FirstOrDefault(v => v.Id == Configuration.selectedVenueId);
@@ -125,25 +127,89 @@ namespace VenueManager
           Configuration.Save();
         }
 
-        var roles = await xivAppClient.Venue.GetRolesAsync(target.Id);
-        xivAppRoles = roles;
-        Log.Information("Auto-loaded {Count} role(s) for venue {VenueId}", roles.Count, target.Id);
-
-        var servicesResp = await xivAppClient.Venue.GetServicesAsync(target.Id);
-        availableServices = servicesResp?.Services ?? new List<Service>();
-        Log.Information("Auto-loaded {Count} service(s) for venue {VenueId}", availableServices.Count, target.Id);
-
-        var bannedPatrons = await xivAppClient.Venue.GetBannedPatronsAsync(target.Id);
-        xivAppBannedPatrons = bannedPatrons ?? new List<BannedPatron>();
-        xivAppBannedPatronsUnavailable = bannedPatrons == null;
-        Log.Information("Auto-loaded {Count} banned patron(s) for venue {VenueId}", xivAppBannedPatrons.Count, target.Id);
-
-        xivAppInventoryEnabled = await xivAppClient.Venue.GetInventoryEnabledAsync(target.Id);
-        Log.Information("Auto-loaded inventory-enabled={0} for venue {VenueId}", xivAppInventoryEnabled, target.Id);
+        await LoadVenueDataAsync(target.Id);
       }
       catch (Exception ex)
       {
         Log.Warning("XIV-App auto-load failed (manual Fetch Venues button still available): {0}", ex.Message);
+      }
+    }
+
+    public async Task LoadVenueDataAsync(string venueId)
+    {
+      if (xivAppClient == null) return;
+      xivAppRoles = await xivAppClient.Venue.GetRolesAsync(venueId);
+      var servicesResp = await xivAppClient.Venue.GetServicesAsync(venueId);
+      availableServices = servicesResp?.Services ?? new List<Service>();
+      var bannedPatrons = await xivAppClient.Venue.GetBannedPatronsAsync(venueId);
+      xivAppBannedPatrons = bannedPatrons ?? new List<BannedPatron>();
+      xivAppBannedPatronsUnavailable = bannedPatrons == null;
+      xivAppInventoryEnabled = await xivAppClient.Venue.GetInventoryEnabledAsync(venueId);
+      Log.Information("Loaded venue {VenueId}: {Roles} roles, {Services} services, {Banned} banned", venueId, xivAppRoles.Count, availableServices.Count, xivAppBannedPatrons.Count);
+    }
+
+    internal static HouseAddress AddressOf(Venue house) =>
+      new(house.WorldName, house.district, house.ward, VenueAddressMatcher.KindOf(house.plot), house.plot, house.room);
+
+    public async Task LoadVenueAddressesAsync()
+    {
+      if (xivAppClient?.Xvm is not { } xvm || xivAppVenues.Count == 0) return;
+      try
+      {
+        xivAppVenueAddresses = await xvm.GetVenueAddressesAsync(xivAppVenues.Select(v => v.Id));
+        AutoLinkSavedHouses();
+      }
+      catch (Exception ex)
+      {
+        Log.Warning("Venue address load failed, houses stay as linked: {0}", ex.Message);
+      }
+    }
+
+    public void AutoLinkSavedHouses()
+    {
+      var changed = false;
+      foreach (var house in venueList.venues.Values)
+      {
+        if (Configuration.houseToXivAppVenue.ContainsKey(house.houseId)) continue;
+        var venueId = VenueAddressMatcher.FindUnique(AddressOf(house), xivAppVenueAddresses);
+        if (venueId is null) continue;
+        Configuration.houseToXivAppVenue[house.houseId] = venueId;
+        Log.Information("Linked saved house {House} to venue {Venue} by address", house.name, venueId);
+        changed = true;
+      }
+      if (changed) Configuration.Save();
+    }
+
+    private async Task FollowHouseToVenueAsync()
+    {
+      try
+      {
+        var house = pluginState.currentHouse;
+        Log.Information("Entered house: world {World} district {District} ward {Ward} plot {Plot} room {Room} type {Type}", house.WorldName, house.district, house.ward, house.plot, house.room, house.type);
+        if (!Configuration.houseToXivAppVenue.TryGetValue(house.houseId, out var venueId) || string.IsNullOrEmpty(venueId))
+        {
+          venueId = VenueAddressMatcher.FindUnique(AddressOf(house), xivAppVenueAddresses);
+          if (venueId is null) return;
+          Configuration.houseToXivAppVenue[house.houseId] = venueId;
+          if (!venueList.venues.ContainsKey(house.houseId))
+          {
+            var saved = new Venue(house) { name = xivAppVenues.FirstOrDefault(v => v.Id == venueId)?.Name ?? house.name };
+            venueList.venues.Add(saved.houseId, saved);
+            venueList.save();
+          }
+          Configuration.Save();
+          Log.Information("Recognised house {House} as venue {Venue} by address", house.houseId, venueId);
+        }
+
+        if (venueId == currentXivAppVenueId) return;
+        currentXivAppVenueId = venueId;
+        Configuration.selectedVenueId = venueId;
+        Configuration.Save();
+        await LoadVenueDataAsync(venueId);
+      }
+      catch (Exception ex)
+      {
+        Log.Warning("Following the house to its venue failed: {0}", ex.Message);
       }
     }
 
@@ -1079,6 +1145,7 @@ namespace VenueManager
                 pluginState.currentHouse.type = (ushort)HousingManager.GetOriginalHouseTerritoryTypeId();
                 pluginState.currentHouse.district = TerritoryUtils.getDistrict(pluginState.currentHouse.type);
                 pluginState.currentHouse.worldId = currentWorldId;
+                _ = FollowHouseToVenueAsync();
 
                 // Auto-open Rooms tab when entering a private chamber (room > 0)
                 if (pluginState.currentHouse.room > 0 && previousRoom != pluginState.currentHouse.room)
