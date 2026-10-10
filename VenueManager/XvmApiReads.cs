@@ -53,6 +53,12 @@ namespace VenueManager
       return XvmApiMapping.MapShifts(mine, open, names);
     }
 
+    internal async Task<List<MyShift>> GetMyShiftsAsync(DateTime now)
+    {
+      var window = $"from={Uri.EscapeDataString((now - TimeSpan.FromDays(1)).ToString("yyyy-MM-ddTHH:mm:ssZ"))}&to={Uri.EscapeDataString((now + TimeSpan.FromDays(1)).ToString("yyyy-MM-ddTHH:mm:ssZ"))}";
+      return await GetAsync<List<MyShift>>($"/me/shifts?{window}") ?? new List<MyShift>();
+    }
+
     internal async Task<List<XvmVenueAddress>> GetVenueAddressesAsync(IEnumerable<string> venueIds)
     {
       var rows = await Task.WhenAll(venueIds.Select(id => GetAsync<XvmVenueAddress>(Venue(id))));

@@ -106,6 +106,20 @@ public class XvmApiReadsTests
     }
 
     [Fact]
+    public async Task My_shifts_come_from_one_call_across_venues()
+    {
+        var handler = new RoutedHandler()
+            .On("/me/shifts", "[{\"id\":1,\"venue_id\":\"v1\",\"status\":\"scheduled\",\"scheduled_start\":\"2026-10-10T19:00:00Z\",\"scheduled_end\":\"2026-10-10T22:00:00Z\",\"actual_start\":null,\"actual_end\":null,\"conflicts\":false},{\"id\":2,\"venue_id\":\"v2\",\"status\":\"active\",\"scheduled_start\":\"2026-10-10T16:00:00Z\",\"scheduled_end\":\"2026-10-10T19:00:00Z\",\"actual_start\":\"2026-10-10T16:05:00Z\",\"actual_end\":null,\"conflicts\":false}]");
+
+        var shifts = await Reads(handler).GetMyShiftsAsync(new DateTime(2026, 10, 10, 20, 0, 0, DateTimeKind.Utc));
+
+        Assert.Equal(new[] { "v1", "v2" }, shifts.Select(s => s.VenueId));
+        Assert.Equal(new DateTime(2026, 10, 10, 16, 5, 0, DateTimeKind.Utc), shifts[1].ActualStart);
+        Assert.Contains("from=2026-10-09T20%3A00%3A00Z", handler.Requests[0].PathAndQuery);
+        Assert.Contains("to=2026-10-11T20%3A00%3A00Z", handler.Requests[0].PathAndQuery);
+    }
+
+    [Fact]
     public async Task Services_join_their_category_names()
     {
         var handler = new RoutedHandler()
