@@ -1,0 +1,37 @@
+name: Publish Dev plugin
+
+on:
+  push:
+    branches: [master, feat/dev-flavour]
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+
+concurrency:
+  group: publish-dev
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Run tests
+        run: dotnet test VenueManager.Tests
+
+      - name: Build Dev package
+        run: scripts/build-dev-package.sh "$RUNNER_TEMP/stage"
+
+      - name: Upload to MinIO
+        env:
+          MC_HOST_dev: https://${{ secrets.MINIO_PLUGIN_DEV_USER }}:${{ secrets.MINIO_PLUGIN_DEV_SECRET }}@media.xivvenuemanager.com
+        run: |
+          curl -sSfL https://dl.min.io/client/mc/release/linux-amd64/mc -o "$RUNNER_TEMP/mc"
+          chmod +x "$RUNNER_TEMP/mc"
+          "$RUNNER_TEMP/mc" cp "$RUNNER_TEMP"/stage/XIVVenueManagerSyncDev-*.zip "$RUNNER_TEMP/stage/icon.png" dev/plugin-dev/
+          "$RUNNER_TEMP/mc" cp "$RUNNER_TEMP/stage/repo.json" dev/plugin-dev/
