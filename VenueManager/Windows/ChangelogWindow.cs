@@ -223,7 +223,11 @@ public class ChangelogWindow : Window, IDisposable
         ImGui.Indent(12f);
         ImGui.Spacing();
         foreach (var item in entry.Items)
-            ImGui.BulletText(item);
+        {
+            ImGui.Bullet();
+            ImGui.SameLine();
+            ImGui.TextWrapped(item);
+        }
         ImGui.Spacing();
         ImGui.Unindent(12f);
     }
