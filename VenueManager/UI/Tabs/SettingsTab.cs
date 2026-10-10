@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Net.Http;
 using System.Numerics;
 using System.Threading.Tasks;
 using Dalamud.Interface;
@@ -34,6 +35,11 @@ public class SettingsTab : ITab
 
   // Status line under Fetch Venues — set by the async Fetch* methods below
   private string xivAppStatus = "";
+  private static readonly HttpClient XvmHttp = new() { Timeout = TimeSpan.FromSeconds(10) };
+  private string pairingCode = "";
+  private bool linking = false;
+  private string linkStatus = "";
+  private Vector4 linkStatusColor = Colors.StatusWarn;
   private Vector4 xivAppStatusColor = Colors.XivOverlay0;
 
   // Not persisted; default hidden so screenshots/shares don't leak the key
@@ -60,6 +66,7 @@ public class SettingsTab : ITab
       DrawWelcomeBanner();
 
     // Primary workflow — surface first so a fresh install lands on the setup it needs
+    DrawAccountLink();
     DrawXivAppSettings();
 
     DrawSectionSeparator();
@@ -481,6 +488,66 @@ public class SettingsTab : ITab
   }
 
   // -- XIV-App Sync ---------------------------------------------------------
+
+  private void DrawAccountLink()
+  {
+    DrawSectionHeader("Account link");
+    ImGui.TextColored(Colors.XivSubtext0, "Link this plugin to your xivvenuemanager.com account with a one-time code.");
+    ImGui.Spacing();
+
+    if (!string.IsNullOrEmpty(this.configuration.xvmApiSecret))
+    {
+      var who = string.IsNullOrEmpty(this.configuration.xvmApiPersonName) ? "your account" : this.configuration.xvmApiPersonName;
+      ImGui.TextColored(StatusOk, $"Linked as {who}");
+      if (ImGui.Button("Unlink"))
+      {
+        this.configuration.xvmApiSecret = "";
+        this.configuration.xvmApiPersonName = "";
+        this.configuration.Save();
+        linkStatus = "";
+      }
+      ImGui.Spacing();
+      return;
+    }
+
+    ImGui.InputTextWithHint("Link code", "ABCD-1234", ref pairingCode, 16);
+    ImGui.SameLine();
+    if (linking) ImGui.BeginDisabled();
+    if (ImGui.Button("Link") && !linking) _ = LinkAccountAsync();
+    if (linking) ImGui.EndDisabled();
+    ImGui.TextDisabled("Get a code at xivvenuemanager.com/dashboard/api-keys.");
+    if (!string.IsNullOrEmpty(linkStatus)) ImGui.TextColored(linkStatusColor, linkStatus);
+    ImGui.Spacing();
+  }
+
+  private async Task LinkAccountAsync()
+  {
+    linking = true;
+    linkStatus = "Linking…";
+    linkStatusColor = StatusWarn;
+    try
+    {
+      var url = string.IsNullOrWhiteSpace(this.configuration.xvmApiUrl) ? XvmApiPairing.DefaultUrl : this.configuration.xvmApiUrl;
+      var result = await XvmApiPairing.LinkAsync(XvmHttp, url, pairingCode);
+      if (result.Success)
+      {
+        this.configuration.xvmApiSecret = result.Secret!;
+        this.configuration.xvmApiPersonName = result.PersonName ?? "";
+        this.configuration.Save();
+        pairingCode = "";
+        linkStatus = "";
+      }
+      else
+      {
+        linkStatus = result.Message;
+        linkStatusColor = StatusErr;
+      }
+    }
+    finally
+    {
+      linking = false;
+    }
+  }
 
   public unsafe void DrawXivAppSettings()
   {

@@ -59,6 +59,10 @@ namespace VenueManager
     public string selectedVenueId { get; set; } = "";
     public bool syncToXivApp { get; set; } = false;
 
+    public string xvmApiUrl { get; set; } = XvmApiPairing.DefaultUrl;
+    public string xvmApiSecret { get; set; } = "";
+    public string xvmApiPersonName { get; set; } = "";
+
     // Maps in-game HouseId → xiv-app venueId so patron visits log to the
     // right venue automatically. Populated from the VenuesTab linking UI.
     public Dictionary<long, string> houseToXivAppVenue { get; set; } = new();
