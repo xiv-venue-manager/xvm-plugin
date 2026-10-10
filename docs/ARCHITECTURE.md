@@ -77,6 +77,8 @@ Gating order (cheapest checks first, to avoid unnecessary async work):
 
 All failures log at Debug level and swallow — a sync hiccup should never surface in chat during live service.
 
+**The Patrons Tab setting only hides the tabs and silences patron output.** Tracking itself (the guest list, visit logging to xvm-api, the patron count and the banned arrival alert) always runs, because staff who tidy their window by hiding the tab must not silently stop syncing visits or lose ban warnings. With the tab hidden, the regular arrival and leave chat alerts, the doorbell sound, the self-entry line and the greeter stay off, which is what the greyed-out Settings imply. A banned patron already inside when you arrive also raises the ban alert, whatever the already-here setting says.
+
 **Chat/sound alerts are only meaningful at a registered venue.** Without a known venue (i.e. `venueList.venues` doesn't contain the current house), every house the player walks into — theirs or not — would spam the same "has entered/left" line with no venue name to attach it to, so unregistered houses are silently skipped for both entry and leave alerts.
 
 **The auto-greeter fires independently of chat alert settings and snooze.** A venue owner may want automated `/tell` greetings without the visual chat noise of entry/leave alerts, so the greeter check happens before (and regardless of) the snooze/chat-alert-enabled checks further down. It skips already-here players when the greeter re-enters the venue (only fires on `entryCount == 1` for the first-visit message, `> 1` for the re-entry message) and only fires at registered venues while a shift is active.

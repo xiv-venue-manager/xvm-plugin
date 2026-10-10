@@ -1277,11 +1277,6 @@ namespace VenueManager
             }
           }
 
-          if (!Configuration.showGuestsTab) {
-            running = false;
-            return;
-          }
-
           bool guestListUpdated = false;
           bool playerArrived = false;
           int playerCount = 0;
@@ -1330,7 +1325,7 @@ namespace VenueManager
             else if (justEnteredHouse)
             {
               getCurrentGuestList().guests[player.Name].timeCursor = DateTime.Now;
-              if (this.Configuration.showChatAlertAlreadyHere)
+              if (this.Configuration.showChatAlertAlreadyHere || (Configuration.alertBannedPatrons && isBannedPatron(player)))
                 showGuestEnterChatAlert(getCurrentGuestList().guests[player.Name], isSelf);
             }
 
@@ -1369,7 +1364,7 @@ namespace VenueManager
           }
           getCurrentGuestList().justLoaded = false;
 
-          if (Configuration.soundAlerts && playerArrived && !pluginState.snoozed)
+          if (Configuration.showGuestsTab && Configuration.soundAlerts && playerArrived && !pluginState.snoozed)
           {
             doorbell.play();
           }
@@ -1425,6 +1420,7 @@ namespace VenueManager
 
       if (isSelf)
       {
+        if (!Configuration.showGuestsTab) return;
         var selfVenue = venueList.venues[pluginState.currentHouse.houseId];
         if (this.Configuration.showPluginNameInChat) messageBuilder.AddText($"[{Name}] ");
         messageBuilder.AddText("You have entered " + selfVenue.name);
@@ -1434,7 +1430,7 @@ namespace VenueManager
 
       // Fires independently of chat alert settings and snooze; only while a shift is active
       var shift = activeShift;
-      if (!justEnteredHouse && shift != null && shift.Status == "ACTIVE")
+      if (Configuration.showGuestsTab && !justEnteredHouse && shift != null && shift.Status == "ACTIVE")
       {
         if (player.entryCount == 1 && Configuration.enableGreeterMode && !string.IsNullOrWhiteSpace(Configuration.greeterMessage))
           SendGameChat($"/tell {player.Name}@{player.WorldName} {Configuration.greeterMessage}");
@@ -1458,6 +1454,7 @@ namespace VenueManager
         return;
       }
 
+      if (!Configuration.showGuestsTab) return;
       if (pluginState.snoozed) return;
       if (!Configuration.showChatAlerts) return;
 
@@ -1498,6 +1495,7 @@ namespace VenueManager
 
     private void showGuestLeaveChatAlert(Player player)
     {
+      if (!Configuration.showGuestsTab) return;
       if (!Configuration.showChatAlerts) return;
       if (!Configuration.showChatAlertLeave) return;
       if (pluginState.snoozed) return;
