@@ -36,9 +36,12 @@ jobs:
 
       - name: Upload to MinIO
         env:
-          MC_HOST_dev: https://${{ secrets.MINIO_PLUGIN_DEV_USER }}:${{ secrets.MINIO_PLUGIN_DEV_SECRET }}@media.xivvenuemanager.com
+          AWS_ACCESS_KEY_ID: ${{ secrets.MINIO_PLUGIN_DEV_USER }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.MINIO_PLUGIN_DEV_SECRET }}
+          AWS_DEFAULT_REGION: us-east-1
         run: |
-          curl -sSfL https://dl.min.io/client/mc/release/linux-amd64/mc -o "$RUNNER_TEMP/mc"
-          chmod +x "$RUNNER_TEMP/mc"
-          "$RUNNER_TEMP/mc" cp "$RUNNER_TEMP"/stage/XIVVenueManagerSyncDev-*.zip "$RUNNER_TEMP/stage/icon.png" dev/plugin-dev/
-          "$RUNNER_TEMP/mc" cp "$RUNNER_TEMP/stage/repo.json" dev/plugin-dev/
+          stage="$RUNNER_TEMP/stage"
+          for f in "$stage"/XIVVenueManagerSyncDev-*.zip "$stage/icon.png"; do
+            aws s3 cp "$f" s3://plugin-dev/ --endpoint-url https://media.xivvenuemanager.com
+          done
+          aws s3 cp "$stage/repo.json" s3://plugin-dev/ --endpoint-url https://media.xivvenuemanager.com --content-type application/json
