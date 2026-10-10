@@ -533,6 +533,8 @@ public class SettingsTab : ITab
     {
       var who = string.IsNullOrEmpty(this.configuration.xvmApiPersonName) ? "your account" : this.configuration.xvmApiPersonName;
       ImGui.TextColored(StatusOk, $"Linked as {who}");
+      if (plugin.xivAppClient?.LinkRejected == true)
+        ImGui.TextColored(StatusErr, "Your link was rejected (revoked or expired). Unlink and link again.");
       if (ImGui.Button("Unlink"))
       {
         this.configuration.xvmApiSecret = "";

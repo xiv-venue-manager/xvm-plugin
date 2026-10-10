@@ -120,6 +120,30 @@ public class XvmApiReadsTests
     }
 
     [Fact]
+    public async Task A_401_reports_the_link_rejected_and_a_later_success_clears_it()
+    {
+        var states = new List<bool>();
+        var rejected = new RoutedHandler().On("/me/venues", "{}", HttpStatusCode.Unauthorized);
+        await Assert.ThrowsAsync<XIVAppApiException>(() => new XvmApiReads(new HttpClient(rejected), "https://api.test/", "s3cret", states.Add).GetVenuesAsync());
+
+        var ok = new RoutedHandler().On("/me/venues", "[]");
+        await new XvmApiReads(new HttpClient(ok), "https://api.test/", "s3cret", states.Add).GetVenuesAsync();
+
+        Assert.Equal(new[] { true, false }, states);
+    }
+
+    [Fact]
+    public async Task A_server_error_leaves_the_link_state_alone()
+    {
+        var states = new List<bool>();
+        var broken = new RoutedHandler().On("/me/venues", "{}", HttpStatusCode.InternalServerError);
+
+        await Assert.ThrowsAsync<XIVAppApiException>(() => new XvmApiReads(new HttpClient(broken), "https://api.test/", "s3cret", states.Add).GetVenuesAsync());
+
+        Assert.Empty(states);
+    }
+
+    [Fact]
     public async Task Services_join_their_category_names()
     {
         var handler = new RoutedHandler()

@@ -16,9 +16,11 @@ namespace VenueManager
     private readonly HttpClient _http;
     private readonly string _root;
     private readonly string _secret;
+    private readonly Action<bool>? _linkState;
 
-    public XvmApiReads(HttpClient http, string baseUrl, string secret)
+    public XvmApiReads(HttpClient http, string baseUrl, string secret, Action<bool>? linkState = null)
     {
+      _linkState = linkState;
       _http = http;
       _root = baseUrl.Trim().TrimEnd('/');
       _secret = secret;
@@ -29,6 +31,8 @@ namespace VenueManager
       using var request = new HttpRequestMessage(HttpMethod.Get, $"{_root}{path}");
       request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _secret);
       using var response = await _http.SendAsync(request);
+      if ((int)response.StatusCode == 401) _linkState?.Invoke(true);
+      else if (response.IsSuccessStatusCode) _linkState?.Invoke(false);
       if (!response.IsSuccessStatusCode)
         throw new XIVAppApiException($"{path}: {(int)response.StatusCode}");
       return await response.Content.ReadFromJsonAsync<T>();
