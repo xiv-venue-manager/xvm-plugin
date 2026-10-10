@@ -40,6 +40,11 @@ public class SettingsTab : ITab
   private bool linking = false;
   private string linkStatus = "";
   private Vector4 linkStatusColor = Colors.StatusWarn;
+  private List<XvmCharacter> myCharacters = new();
+  private bool charactersLoaded = false;
+  private bool charactersBusy = false;
+  private string characterStatus = "";
+  private Vector4 characterStatusColor = Colors.StatusWarn;
   private Vector4 xivAppStatusColor = Colors.XivOverlay0;
 
   // Not persisted; default hidden so screenshots/shares don't leak the key
@@ -542,11 +547,15 @@ public class SettingsTab : ITab
         this.configuration.Save();
         plugin.xivAppClient?.ClearXvm();
         linkStatus = "";
+        myCharacters = new();
+        charactersLoaded = false;
+        characterStatus = "";
         return;
       }
       ImGui.Spacing();
       DrawFetchVenuesButton();
       DrawVenueSelector();
+      DrawCharacters();
       ImGui.Spacing();
       return;
     }
@@ -559,6 +568,97 @@ public class SettingsTab : ITab
     ImGui.TextDisabled("Get a code at xivvenuemanager.com/dashboard/api-keys.");
     if (!string.IsNullOrEmpty(linkStatus)) ImGui.TextColored(linkStatusColor, linkStatus);
     ImGui.Spacing();
+  }
+
+  private (string Name, string World)? CurrentCharacter()
+  {
+    if (Plugin.Objects.Length == 0 || Plugin.Objects[0] is not Dalamud.Game.ClientState.Objects.SubKinds.IPlayerCharacter self) return null;
+    var player = Player.fromCharacter(self);
+    return string.IsNullOrEmpty(player.Name) || string.IsNullOrEmpty(player.WorldName) ? null : (player.Name, player.WorldName);
+  }
+
+  private void DrawCharacters()
+  {
+    ImGui.Spacing();
+    ImGui.TextColored(Colors.XivSubtext0, "Your characters");
+    if (!charactersLoaded && !charactersBusy) _ = RefreshCharactersAsync();
+
+    if (charactersLoaded && myCharacters.Count == 0)
+      ImGui.TextDisabled("None linked yet. Your visits count as a patron's, not as working, until a character is linked.");
+
+    int? remove = null;
+    foreach (var character in myCharacters)
+    {
+      ImGui.Text($"{character.CharacterName} @ {character.World}{(character.IsPrimary ? " (primary)" : "")}");
+      ImGui.SameLine();
+      if (ImGui.SmallButton($"Unlink##char{character.Id}") && !charactersBusy) remove = character.Id;
+    }
+    if (remove is int id) _ = UnlinkCharacterAsync(id);
+
+    var current = CurrentCharacter();
+    var disabled = current is null || charactersBusy;
+    if (disabled) ImGui.BeginDisabled();
+    var label = current is { } c ? $"Link current character ({c.Name} @ {c.World})" : "Link current character";
+    if (ImGui.Button(label + "##linkchar") && current is { } toLink) _ = LinkCharacterAsync(toLink.Name, toLink.World);
+    if (disabled) ImGui.EndDisabled();
+    if (current is null && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+      ImGui.SetTooltip("Log in to a character first.");
+
+    if (!string.IsNullOrEmpty(characterStatus)) ImGui.TextColored(characterStatusColor, characterStatus);
+  }
+
+  private async Task RefreshCharactersAsync()
+  {
+    if (plugin.xivAppClient?.Xvm is not { } xvm) return;
+    charactersBusy = true;
+    try
+    {
+      myCharacters = await xvm.GetMyCharactersAsync();
+    }
+    catch (Exception ex)
+    {
+      characterStatus = $"Could not load your characters: {ex.Message}";
+      characterStatusColor = StatusErr;
+    }
+    finally
+    {
+      charactersLoaded = true;
+      charactersBusy = false;
+    }
+  }
+
+  private async Task LinkCharacterAsync(string name, string world)
+  {
+    if (plugin.xivAppClient?.XvmWrites is not { } writes) return;
+    charactersBusy = true;
+    try
+    {
+      var result = await writes.LinkCharacterAsync(name, world);
+      characterStatus = result.Success ? (result.Created ? $"Linked {name}." : $"{name} is already linked.") : (result.Error ?? "Could not link the character.");
+      characterStatusColor = result.Success ? StatusOk : StatusErr;
+    }
+    finally
+    {
+      charactersBusy = false;
+    }
+    await RefreshCharactersAsync();
+  }
+
+  private async Task UnlinkCharacterAsync(int characterId)
+  {
+    if (plugin.xivAppClient?.XvmWrites is not { } writes) return;
+    charactersBusy = true;
+    try
+    {
+      var result = await writes.UnlinkCharacterAsync(characterId);
+      characterStatus = result.Success ? "Unlinked." : (result.Error ?? "Could not unlink the character.");
+      characterStatusColor = result.Success ? StatusOk : StatusErr;
+    }
+    finally
+    {
+      charactersBusy = false;
+    }
+    await RefreshCharactersAsync();
   }
 
   private async Task LinkAccountAsync()

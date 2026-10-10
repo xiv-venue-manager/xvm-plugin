@@ -140,6 +140,15 @@ namespace VenueManager
     public async Task<LogTransactionResult> LinkItemAsync(string venueId, string serviceId, int itemId, string itemName, int? iconId) =>
       Result(await SendAsync(HttpMethod.Put, $"{Venue(venueId)}/services/{serviceId}/inventory", new XvmLinkBody(itemId, itemName, iconId)));
 
+    public async Task<CharacterLinkResult> LinkCharacterAsync(string characterName, string world)
+    {
+      var reply = await SendAsync(HttpMethod.Post, "/me/characters", new XvmCharacterBody(characterName, world));
+      return reply.Ok ? new CharacterLinkResult(true, reply.Status == 201, null) : new CharacterLinkResult(false, false, reply.Error);
+    }
+
+    public async Task<LogTransactionResult> UnlinkCharacterAsync(int characterId) =>
+      Result(await SendAsync(HttpMethod.Delete, $"/me/characters/{characterId}"));
+
     public async Task<LogTransactionResult> RestockAsync(string venueId, string serviceId, int stockCount) =>
       Result(await SendAsync(HttpMethod.Put, $"{Venue(venueId)}/services/{serviceId}/inventory/stock", new XvmStockBody(stockCount)));
   }

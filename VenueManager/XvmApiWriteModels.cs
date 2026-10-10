@@ -40,6 +40,18 @@ namespace VenueManager
   internal sealed record XvmStockBody(
     [property: JsonPropertyName("stock_count")] int StockCount);
 
+  internal sealed record XvmCharacter(
+    [property: JsonPropertyName("id")] int Id,
+    [property: JsonPropertyName("character_name")] string CharacterName,
+    [property: JsonPropertyName("world")] string World,
+    [property: JsonPropertyName("is_primary")] bool IsPrimary);
+
+  internal sealed record XvmCharacterBody(
+    [property: JsonPropertyName("character_name")] string CharacterName,
+    [property: JsonPropertyName("world")] string World);
+
+  internal sealed record CharacterLinkResult(bool Success, bool Created, string? Error);
+
   internal sealed record XvmShiftReply(
     [property: JsonPropertyName("status")] string Status,
     [property: JsonPropertyName("worked_minutes")] int? WorkedMinutes);

@@ -69,6 +69,9 @@ namespace VenueManager
       return rows.Where(r => r is not null).Select(r => r!).ToList();
     }
 
+    internal async Task<List<XvmCharacter>> GetMyCharactersAsync() =>
+      await GetAsync<List<XvmCharacter>>("/me/characters") ?? new List<XvmCharacter>();
+
     public async Task<List<Role>> GetRolesAsync(string venueId)
     {
       var own = await MyVenueAsync(venueId);

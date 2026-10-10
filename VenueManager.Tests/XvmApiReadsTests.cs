@@ -144,6 +144,18 @@ public class XvmApiReadsTests
     }
 
     [Fact]
+    public async Task My_characters_come_from_me_characters_primary_first()
+    {
+        var handler = new RoutedHandler().On("/me/characters", "[{\"id\":3,\"character_name\":\"Ehno Cure\",\"world\":\"Raiden\",\"is_primary\":true},{\"id\":4,\"character_name\":\"Alt Name\",\"world\":\"Twintania\",\"is_primary\":false}]");
+
+        var characters = await Reads(handler).GetMyCharactersAsync();
+
+        Assert.Equal(new[] { "Ehno Cure", "Alt Name" }, characters.Select(c => c.CharacterName));
+        Assert.True(characters[0].IsPrimary);
+        Assert.Equal("/me/characters", handler.Requests[0].PathAndQuery);
+    }
+
+    [Fact]
     public async Task Services_join_their_category_names()
     {
         var handler = new RoutedHandler()

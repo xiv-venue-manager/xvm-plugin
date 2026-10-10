@@ -235,6 +235,46 @@ public class XvmApiWritesTests
     }
 
     [Fact]
+    public async Task Linking_a_character_posts_name_and_world_and_says_whether_it_was_new()
+    {
+        var handler = new Handler().On("POST", "/me/characters", "{\"id\":3,\"character_name\":\"Ehno Cure\",\"world\":\"Raiden\",\"is_primary\":true}", HttpStatusCode.Created);
+        var created = await Writes(handler).LinkCharacterAsync("Ehno Cure", "Raiden");
+
+        var again = new Handler().On("POST", "/me/characters", "{\"id\":3,\"character_name\":\"Ehno Cure\",\"world\":\"Raiden\",\"is_primary\":true}", HttpStatusCode.OK);
+        var existing = await Writes(again).LinkCharacterAsync("Ehno Cure", "Raiden");
+
+        Assert.True(created.Success);
+        Assert.True(created.Created);
+        Assert.True(existing.Success);
+        Assert.False(existing.Created);
+        var body = Json(handler.Requests[0].Body);
+        Assert.Equal("Ehno Cure", body.GetProperty("character_name").GetString());
+        Assert.Equal("Raiden", body.GetProperty("world").GetString());
+    }
+
+    [Fact]
+    public async Task A_character_linked_to_another_account_shows_the_servers_sentence()
+    {
+        var handler = new Handler().On("POST", "/me/characters", "{\"detail\":\"That character is linked to another account.\"}", HttpStatusCode.Conflict);
+
+        var result = await Writes(handler).LinkCharacterAsync("Someone Else", "Raiden");
+
+        Assert.False(result.Success);
+        Assert.Equal("That character is linked to another account.", result.Error);
+    }
+
+    [Fact]
+    public async Task Unlinking_a_character_deletes_it_by_id()
+    {
+        var handler = new Handler().On("DELETE", "/me/characters/3", "", HttpStatusCode.NoContent);
+
+        var result = await Writes(handler).UnlinkCharacterAsync(3);
+
+        Assert.True(result.Success);
+        Assert.Equal("DELETE", handler.Requests[0].Method);
+    }
+
+    [Fact]
     public async Task A_dropped_connection_becomes_a_failed_result_not_an_exception()
     {
         var handler = new ThrowingHandler();
