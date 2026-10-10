@@ -83,6 +83,9 @@ public class SettingsTab : ITab
     DrawBanAlerts();
 
     DrawSectionSeparator();
+    DrawShiftPrompts();
+
+    DrawSectionSeparator();
     DrawPatronChatAlerts();
 
     DrawSectionSeparator();
@@ -234,6 +237,21 @@ public class SettingsTab : ITab
   }
 
   // -- Chat Alerts ----------------------------------------------------------
+
+  private void DrawShiftPrompts()
+  {
+    DrawSectionHeader("Shift Prompts");
+    var prompts = this.configuration.shiftPrompts;
+    if (ImGui.Checkbox("Remind me to clock in and out", ref prompts))
+    {
+      this.configuration.shiftPrompts = prompts;
+      this.configuration.Save();
+    }
+    if (ImGui.IsItemHovered())
+    {
+      ImGui.SetTooltip("Shows a notification when a shift of yours starts or runs past its end, at any venue. It never clocks you in or out by itself.");
+    }
+  }
 
   private void DrawBanAlerts()
   {

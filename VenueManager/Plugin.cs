@@ -3,6 +3,7 @@ using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
+using Dalamud.Interface.ImGuiNotification;
 using Dalamud.Game.Gui.Dtr;
 using VenueManager.Windows;
 using Dalamud.Game.ClientState.Objects.SubKinds;
@@ -42,6 +43,7 @@ namespace VenueManager
     [PluginService] public static ITargetManager TargetManager { get; private set; } = null!;
     [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
     [PluginService] public static IDtrBar DtrBar { get; private set; } = null!;
+    [PluginService] public static INotificationManager Notifications { get; private set; } = null!;
 
     public Configuration Configuration { get; init; }
     public PluginState pluginState { get; init; }
@@ -70,8 +72,10 @@ namespace VenueManager
     private volatile bool shiftPollInFlight = false;
     private long lastBannedPollMs = 0;
     private volatile bool bannedPollInFlight = false;
-    private volatile string? _shiftReminderShiftId = null;
-    private long _shiftReminderLastMs = 0;
+    private readonly Dictionary<int, PromptMemory> shiftPromptMemory = new();
+    private readonly HashSet<int> mutedShifts = new();
+    private long lastPromptPollMs = 0;
+    private bool promptPollInFlight = false;
     // Non-blocking try-acquire mutex shared by chat-command and UI clock actions
     public readonly SemaphoreSlim clockSem = new SemaphoreSlim(1, 1);
 
@@ -958,38 +962,91 @@ namespace VenueManager
       return $"{(int)t.TotalSeconds}s";
     }
 
-    // Reminds when an ACTIVE shift runs past scheduled end; repeats every 15 min — see ARCHITECTURE.md § Shift tracking
-    private void CheckShiftEndReminder(ShiftDto? pick)
+    private void PollShiftPromptsAsync()
     {
-      if (pick == null || pick.Status != "ACTIVE" || string.IsNullOrEmpty(pick.ScheduledEnd))
-      {
-        _shiftReminderShiftId = null;
-        _shiftReminderLastMs = 0;
-        return;
-      }
-
-      if (!DateTime.TryParse(pick.ScheduledEnd, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var endDt))
-        return;
-
-      var overBy = DateTime.UtcNow - endDt.ToUniversalTime();
-      if (overBy.TotalSeconds <= 0)
-      {
-        if (_shiftReminderShiftId == pick.Id) { _shiftReminderShiftId = null; _shiftReminderLastMs = 0; }
-        return;
-      }
-
+      if (promptPollInFlight || !Configuration.shiftPrompts) return;
       var nowMs = Environment.TickCount64;
-      bool firstReminder = _shiftReminderShiftId != pick.Id;
-      bool intervalElapsed = nowMs - _shiftReminderLastMs >= 15 * 60 * 1000;
+      if (nowMs - lastPromptPollMs < 60_000) return;
+      if (xivAppClient?.Xvm is not { } xvm) return;
 
-      if (!firstReminder && !intervalElapsed) return;
+      lastPromptPollMs = nowMs;
+      promptPollInFlight = true;
+      _ = Task.Run(async () =>
+      {
+        try
+        {
+          var now = DateTime.UtcNow;
+          var shifts = await xvm.GetMyShiftsAsync(now);
+          List<ShiftPrompt> due;
+          lock (mutedShifts) due = ShiftPromptPlanner.Due(now, shifts, shiftPromptMemory, mutedShifts);
+          foreach (var prompt in due)
+          {
+            shiftPromptMemory[prompt.ShiftId] = new PromptMemory(prompt.Kind, now);
+            ShowShiftPrompt(prompt);
+          }
+        }
+        catch (Exception ex)
+        {
+          Log.Warning("Shift prompt poll failed: {0}", ex.Message);
+        }
+        finally
+        {
+          promptPollInFlight = false;
+        }
+      });
+    }
 
-      string prefix = Configuration.showPluginNameInChat ? $"[{Name}] " : "";
-      string overMsg = overBy.TotalMinutes < 2 ? "just ended" : $"ended {FormatDuration(overBy)} ago";
-      Chat.Print(prefix + $"Your shift {overMsg} — type /xvm end when you're done.");
+    private void ShowShiftPrompt(ShiftPrompt prompt)
+    {
+      var venueName = xivAppVenues.FirstOrDefault(v => v.Id == prompt.VenueId)?.Name ?? "a venue";
+      var starting = prompt.Kind == PromptKind.Start;
+      var verb = starting ? "Clock in" : "Clock out";
+      var text = starting ? $"Your shift at {venueName} has started." : $"Your shift at {venueName} has ended.";
 
-      _shiftReminderShiftId = pick.Id;
-      _shiftReminderLastMs = nowMs;
+      var prefix = Configuration.showPluginNameInChat ? $"[{Name}] " : "";
+      Chat.Print(prefix + text + $" Use the notification or /xvm {(starting ? "start" : "end")}.");
+
+      var notification = Notifications.AddNotification(new Notification
+      {
+        Title = starting ? "Shift started" : "Shift ended",
+        Content = text,
+        Type = NotificationType.Info,
+        InitialDuration = TimeSpan.FromMinutes(2),
+        UserDismissable = true,
+      });
+      notification.DrawActions += args =>
+      {
+        if (ImGui.Button(verb))
+        {
+          _ = ClockFromPromptAsync(prompt, starting);
+          notification.DismissNow();
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Not now"))
+        {
+          lock (mutedShifts) mutedShifts.Add(prompt.ShiftId);
+          notification.DismissNow();
+        }
+      };
+    }
+
+    private async Task ClockFromPromptAsync(ShiftPrompt prompt, bool clockIn)
+    {
+      if (xivAppClient == null) return;
+      var shiftId = prompt.ShiftId.ToString(CultureInfo.InvariantCulture);
+      var result = clockIn
+        ? await xivAppClient.Shift.ClockInAsync(prompt.VenueId, shiftId)
+        : await xivAppClient.Shift.ClockOutAsync(prompt.VenueId, shiftId);
+      var chatPrefix = Configuration.showPluginNameInChat ? $"[{Name}] " : "";
+      if (result.Success)
+      {
+        Chat.Print(chatPrefix + (clockIn ? "Clocked in." : "Clocked out."));
+        InvalidateShiftPollCache();
+      }
+      else
+      {
+        Chat.Print(chatPrefix + $"{(clockIn ? "Clock-in" : "Clock-out")} failed: {result.Error ?? "unknown error"}");
+      }
     }
 
     // Polls every 30s so VIP/banned status set on the dashboard reaches the plugin without a manual resync
@@ -1058,7 +1115,6 @@ namespace VenueManager
             }
           }
           activeShift = pick;
-          CheckShiftEndReminder(pick);
         }
         catch (Exception ex)
         {
@@ -1082,6 +1138,7 @@ namespace VenueManager
       {
         UpdateDtrBar();
         PollBannedPatronsAsync();
+        PollShiftPromptsAsync();
 
         // Exterior-entry poll — see ARCHITECTURE.md § Housing/location detection
         if (!pluginState.userInHouse && entryPollStopwatch.ElapsedMilliseconds > 1000)
