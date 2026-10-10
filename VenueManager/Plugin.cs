@@ -68,6 +68,8 @@ namespace VenueManager
 
     // Active shift cache, populated by background poll — see ARCHITECTURE.md § Shift tracking
     public volatile ShiftDto? activeShift = null;
+    private volatile ShiftDto? labelShift = null;
+    private volatile string? labelShiftVenueId = null;
     private long lastShiftPollMs = 0;
     private volatile bool shiftPollInFlight = false;
     private long lastBannedPollMs = 0;
@@ -911,6 +913,10 @@ namespace VenueManager
           break;
       }
       dtrEntry.Text = text;
+      var shiftVenue = labelShiftVenueId is null ? null : xivAppVenues.Find(v => v.Id == labelShiftVenueId)?.Name;
+      dtrEntry.Tooltip = shiftVenue is null || (mode != DtrDisplayMode.ShiftStatus && mode != DtrDisplayMode.Combined)
+        ? "XIV Venue Manager — click to open"
+        : $"XIV Venue Manager — click to open\nShift at {shiftVenue}";
     }
 
     // xiv-app linked name first, falls back to raw ward/plot tag; "Outside" when not in a house
@@ -936,7 +942,7 @@ namespace VenueManager
     private string BuildShiftLabel(bool prefix = true, bool compact = false)
     {
       var p = prefix ? "VM: " : "";
-      var s = activeShift;
+      var s = labelShift;
 
       if (s != null && s.Status == "ACTIVE" && !string.IsNullOrEmpty(s.ActualStart))
       {
@@ -1088,40 +1094,33 @@ namespace VenueManager
       });
     }
 
-    // Picks ACTIVE shift, else earliest future SCHEDULED, else null; errors swallowed ("Off shift" is a truthful fallback)
+    // Label shows the clocked-in shift at any venue, else the soonest upcoming one; activeShift stays the current venue's for the greeter
     private void PollActiveShiftAsync()
     {
       if (shiftPollInFlight) return;
       var nowMs = Environment.TickCount64;
       if (nowMs - lastShiftPollMs < 30_000) return;
-      if (xivAppClient == null || !xivAppClient.IsConfigured) return;
-      if (string.IsNullOrEmpty(currentXivAppVenueId)) return;
+      if (xivAppClient?.Xvm is not { } xvm) return;
 
       lastShiftPollMs = nowMs;
       shiftPollInFlight = true;
+      var venueId = currentXivAppVenueId;
       _ = Task.Run(async () =>
       {
         try
         {
-          var list = (await xivAppClient.Shift.GetShiftsResponseAsync(currentXivAppVenueId)).Shifts;
-          ShiftDto? pick = null;
-          foreach (var s in list)
+          var now = DateTime.UtcNow;
+          var all = await xvm.GetMyShiftsAsync(now);
+          if (venueId != currentXivAppVenueId)
           {
-            if (s.Status == "ACTIVE") { pick = s; break; }
+            lastShiftPollMs = 0;
+            return;
           }
-          if (pick == null)
-          {
-            DateTime? bestStart = null;
-            foreach (var s in list)
-            {
-              if (s.Status != "SCHEDULED" || string.IsNullOrEmpty(s.ScheduledStart)) continue;
-              if (!DateTime.TryParse(s.ScheduledStart, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dt)) continue;
-              var utc = dt.ToUniversalTime();
-              if (utc < DateTime.UtcNow) continue;
-              if (bestStart == null || utc < bestStart.Value) { bestStart = utc; pick = s; }
-            }
-          }
-          activeShift = pick;
+          var anywhere = ShiftLabelPicker.Pick(now, all, venueId);
+          var here = string.IsNullOrEmpty(venueId) ? null : ShiftLabelPicker.Pick(now, all.Where(s => s.VenueId == venueId), venueId);
+          activeShift = here is null ? null : ToShiftDto(here);
+          labelShift = anywhere is null ? null : ToShiftDto(anywhere);
+          labelShiftVenueId = anywhere?.VenueId;
         }
         catch (Exception ex)
         {
@@ -1132,6 +1131,20 @@ namespace VenueManager
           shiftPollInFlight = false;
         }
       });
+    }
+
+    private static ShiftDto ToShiftDto(MyShift s)
+    {
+      static string? Iso(DateTime? t) => t?.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
+      return new ShiftDto
+      {
+        Id = s.Id.ToString(CultureInfo.InvariantCulture),
+        ScheduledStart = Iso(s.ScheduledStart) ?? "",
+        ScheduledEnd = Iso(s.ScheduledEnd) ?? "",
+        ActualStart = Iso(s.ActualStart),
+        ActualEnd = Iso(s.ActualEnd),
+        Status = XvmApiMapping.ShiftStatus(s.Status),
+      };
     }
 
     private unsafe void OnFrameworkUpdate(IFramework framework)
