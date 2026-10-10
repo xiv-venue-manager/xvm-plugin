@@ -17,5 +17,8 @@
     <Compile Include="..\VenueManager\XvmApiModels.cs" Link="XvmApiModels.cs" />
     <Compile Include="..\VenueManager\XvmApiMapping.cs" Link="XvmApiMapping.cs" />
     <Compile Include="..\VenueManager\XvmApiReads.cs" Link="XvmApiReads.cs" />
+    <Compile Include="..\VenueManager\XvmApiWriteModels.cs" Link="XvmApiWriteModels.cs" />
+    <Compile Include="..\VenueManager\XvmApiErrors.cs" Link="XvmApiErrors.cs" />
+    <Compile Include="..\VenueManager\XvmApiWrites.cs" Link="XvmApiWrites.cs" />
   </ItemGroup>
 </Project>
