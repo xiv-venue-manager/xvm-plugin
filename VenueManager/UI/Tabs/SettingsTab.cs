@@ -539,8 +539,9 @@ public class SettingsTab : ITab
       }
       else
       {
-        linkStatus = result.Message;
+        linkStatus = string.IsNullOrEmpty(result.Detail) ? result.Message : $"{result.Message} ({result.Detail})";
         linkStatusColor = StatusErr;
+        if (!string.IsNullOrEmpty(result.Detail)) Plugin.Log.Warning("Account link failed: {0}", result.Detail);
       }
     }
     finally

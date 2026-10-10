@@ -99,6 +99,31 @@ public class XvmApiPairingTests
     }
 
     [Fact]
+    public async Task Explains_a_rejected_me_with_the_status_the_servers_reason_and_the_secret_length_but_never_the_secret()
+    {
+        var reason = "{\"detail\":\"Invalid credential\"}";
+        var (http, _) = Client(new FakeHandler().Respond(HttpStatusCode.Created, Exchanged).Respond(HttpStatusCode.Unauthorized, reason));
+
+        var result = await XvmApiPairing.LinkAsync(http, "https://api.test", "ABCD1234");
+
+        Assert.Contains("/me", result.Detail);
+        Assert.Contains("401", result.Detail);
+        Assert.Contains("Invalid credential", result.Detail);
+        Assert.Contains("secret length 6", result.Detail);
+        Assert.DoesNotContain("s3cret", result.Detail);
+    }
+
+    [Fact]
+    public async Task Explains_an_unexpected_exchange_failure_with_its_status_and_reason()
+    {
+        var (http, _) = Client(new FakeHandler().Respond(HttpStatusCode.InternalServerError, "{\"detail\":\"boom\"}"));
+        var result = await XvmApiPairing.LinkAsync(http, "https://api.test", "ABCD1234");
+        Assert.Contains("exchange", result.Detail);
+        Assert.Contains("500", result.Detail);
+        Assert.Contains("boom", result.Detail);
+    }
+
+    [Fact]
     public async Task An_empty_code_is_unknown_and_sends_nothing()
     {
         var (http, handler) = Client(new FakeHandler());

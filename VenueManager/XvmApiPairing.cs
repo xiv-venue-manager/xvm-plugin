@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
@@ -18,7 +19,7 @@ namespace VenueManager
     Failed,
   }
 
-  public record PairingResult(PairingOutcome Outcome, string? Secret = null, string? PersonName = null)
+  public record PairingResult(PairingOutcome Outcome, string? Secret = null, string? PersonName = null, string? Detail = null)
   {
     public bool Success => Outcome == PairingOutcome.Linked;
 
@@ -42,6 +43,23 @@ namespace VenueManager
     internal sealed record MePerson([property: JsonPropertyName("display_name")] string? DisplayName);
 
     internal sealed record MeResponse([property: JsonPropertyName("person")] MePerson? Person);
+
+    private static async Task<string> DescribeAsync(string step, HttpResponseMessage response, int? secretLength = null)
+    {
+      var body = await response.Content.ReadAsStringAsync();
+      var reason = body;
+      try
+      {
+        using var json = JsonDocument.Parse(body);
+        if (json.RootElement.TryGetProperty("detail", out var detail)) reason = detail.ToString();
+      }
+      catch (JsonException)
+      {
+      }
+      if (reason.Length > 200) reason = reason[..200];
+      var text = $"{step} {(int)response.StatusCode}: {reason}";
+      return secretLength is null ? text : $"{text}, secret length {secretLength}";
+    }
 
     public static string NormalizeCode(string? raw)
     {
@@ -68,15 +86,18 @@ namespace VenueManager
           case HttpStatusCode.TooManyRequests:
             return new PairingResult(PairingOutcome.RateLimited);
         }
-        if (!exchange.IsSuccessStatusCode) return new PairingResult(PairingOutcome.Failed);
+        if (!exchange.IsSuccessStatusCode)
+          return new PairingResult(PairingOutcome.Failed, Detail: await DescribeAsync("exchange", exchange));
 
         var issued = await exchange.Content.ReadFromJsonAsync<ExchangeResponse>();
-        if (string.IsNullOrEmpty(issued?.Secret)) return new PairingResult(PairingOutcome.Failed);
+        if (string.IsNullOrEmpty(issued?.Secret))
+          return new PairingResult(PairingOutcome.Failed, Detail: "exchange reply had no secret");
 
         using var request = new HttpRequestMessage(HttpMethod.Get, $"{root}/me");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", issued.Secret);
         using var me = await http.SendAsync(request);
-        if (!me.IsSuccessStatusCode) return new PairingResult(PairingOutcome.Failed);
+        if (!me.IsSuccessStatusCode)
+          return new PairingResult(PairingOutcome.Failed, Detail: await DescribeAsync("/me", me, issued.Secret.Length));
 
         var identity = await me.Content.ReadFromJsonAsync<MeResponse>();
         return new PairingResult(PairingOutcome.Linked, issued.Secret, identity?.Person?.DisplayName);
