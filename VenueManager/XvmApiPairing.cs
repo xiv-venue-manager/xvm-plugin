@@ -42,9 +42,11 @@ namespace VenueManager
 #if DEV_FLAVOUR
     public const string DefaultUrl = DevUrl;
     public const bool IsDevFlavour = true;
+    public const string WebUrl = "https://dev.xivvenuemanager.com";
 #else
     public const string DefaultUrl = ProdUrl;
     public const bool IsDevFlavour = false;
+    public const string WebUrl = "https://xivvenuemanager.com";
 #endif
 
     private static readonly string[] DevAllowedHosts = { "dev-api.xivvenuemanager.com", "localhost", "127.0.0.1", "100.80.129.7" };

@@ -116,7 +116,7 @@ namespace VenueManager
       if (string.IsNullOrEmpty(currentXivAppVenueId)) return null;
       var venue = xivAppVenues.Find(v => v.Id == currentXivAppVenueId);
       if (venue == null || string.IsNullOrEmpty(venue.Slug)) return null;
-      const string baseUrl = "https://xivvenuemanager.com";
+      const string baseUrl = XvmApiPairing.WebUrl;
       var path = $"/dashboard/{venue.Slug}";
       if (!string.IsNullOrEmpty(subpath))
         path += "/" + subpath.TrimStart('/');
