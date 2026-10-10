@@ -16,6 +16,12 @@ public class XvmApiPairingTests
             return this;
         }
 
+        public FakeHandler Repeat(HttpStatusCode status, int times, string json = "{}")
+        {
+            for (var i = 0; i < times; i++) Respond(status, json);
+            return this;
+        }
+
         public FakeHandler Throw()
         {
             _responses.Enqueue(() => throw new HttpRequestException("no route"));
@@ -92,19 +98,58 @@ public class XvmApiPairingTests
     [Fact]
     public async Task Does_not_keep_a_secret_that_me_rejects()
     {
-        var (http, _) = Client(new FakeHandler().Respond(HttpStatusCode.Created, Exchanged).Respond(HttpStatusCode.Unauthorized));
-        var result = await XvmApiPairing.LinkAsync(http, "https://api.test", "ABCD1234");
+        var (http, _) = Client(new FakeHandler().Respond(HttpStatusCode.Created, Exchanged).Repeat(HttpStatusCode.Unauthorized, 6));
+        var result = await XvmApiPairing.LinkAsync(http, "https://api.test", "ABCD1234", TimeSpan.Zero);
         Assert.Equal(PairingOutcome.Failed, result.Outcome);
         Assert.Null(result.Secret);
+    }
+
+    [Fact]
+    public async Task Retries_me_while_the_server_has_not_yet_committed_the_new_credential()
+    {
+        var (http, handler) = Client(new FakeHandler()
+            .Respond(HttpStatusCode.Created, Exchanged)
+            .Respond(HttpStatusCode.Unauthorized)
+            .Respond(HttpStatusCode.Unauthorized)
+            .Respond(HttpStatusCode.OK, Me));
+
+        var result = await XvmApiPairing.LinkAsync(http, "https://api.test", "ABCD1234", TimeSpan.Zero);
+
+        Assert.True(result.Success);
+        Assert.Equal("s3cret", result.Secret);
+        Assert.Equal(4, handler.Requests.Count);
+        Assert.All(handler.Requests.Skip(1), r => Assert.Equal("Bearer s3cret", r.Authorization));
+    }
+
+    [Fact]
+    public async Task Gives_up_on_me_after_six_attempts()
+    {
+        var (http, handler) = Client(new FakeHandler().Respond(HttpStatusCode.Created, Exchanged).Repeat(HttpStatusCode.Unauthorized, 10));
+
+        var result = await XvmApiPairing.LinkAsync(http, "https://api.test", "ABCD1234", TimeSpan.Zero);
+
+        Assert.Equal(PairingOutcome.Failed, result.Outcome);
+        Assert.Equal(7, handler.Requests.Count);
+    }
+
+    [Fact]
+    public async Task Does_not_retry_me_for_other_failures()
+    {
+        var (http, handler) = Client(new FakeHandler().Respond(HttpStatusCode.Created, Exchanged).Respond(HttpStatusCode.InternalServerError));
+
+        var result = await XvmApiPairing.LinkAsync(http, "https://api.test", "ABCD1234", TimeSpan.Zero);
+
+        Assert.Equal(PairingOutcome.Failed, result.Outcome);
+        Assert.Equal(2, handler.Requests.Count);
     }
 
     [Fact]
     public async Task Explains_a_rejected_me_with_the_status_the_servers_reason_and_the_secret_length_but_never_the_secret()
     {
         var reason = "{\"detail\":\"Invalid credential\"}";
-        var (http, _) = Client(new FakeHandler().Respond(HttpStatusCode.Created, Exchanged).Respond(HttpStatusCode.Unauthorized, reason));
+        var (http, _) = Client(new FakeHandler().Respond(HttpStatusCode.Created, Exchanged).Repeat(HttpStatusCode.Unauthorized, 6, reason));
 
-        var result = await XvmApiPairing.LinkAsync(http, "https://api.test", "ABCD1234");
+        var result = await XvmApiPairing.LinkAsync(http, "https://api.test", "ABCD1234", TimeSpan.Zero);
 
         Assert.Contains("/me", result.Detail);
         Assert.Contains("401", result.Detail);

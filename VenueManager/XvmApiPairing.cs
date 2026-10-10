@@ -38,11 +38,29 @@ namespace VenueManager
   {
     public const string DefaultUrl = "https://api.xivvenuemanager.com";
 
+    private const int MeAttempts = 6;
+    private static readonly TimeSpan DefaultRetryDelay = TimeSpan.FromMilliseconds(250);
+
     internal sealed record ExchangeResponse([property: JsonPropertyName("secret")] string? Secret);
 
     internal sealed record MePerson([property: JsonPropertyName("display_name")] string? DisplayName);
 
     internal sealed record MeResponse([property: JsonPropertyName("person")] MePerson? Person);
+
+    private static async Task<HttpResponseMessage> GetMeAsync(HttpClient http, string root, string secret, TimeSpan delay)
+    {
+      var attempt = 0;
+      while (true)
+      {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{root}/me");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", secret);
+        var response = await http.SendAsync(request);
+        attempt++;
+        if (response.StatusCode != HttpStatusCode.Unauthorized || attempt >= MeAttempts) return response;
+        response.Dispose();
+        await Task.Delay(delay);
+      }
+    }
 
     private static async Task<string> DescribeAsync(string step, HttpResponseMessage response, int? secretLength = null)
     {
@@ -68,7 +86,7 @@ namespace VenueManager
       return compact.Length == 8 ? $"{compact[..4]}-{compact[4..]}" : compact;
     }
 
-    public static async Task<PairingResult> LinkAsync(HttpClient http, string baseUrl, string? rawCode)
+    public static async Task<PairingResult> LinkAsync(HttpClient http, string baseUrl, string? rawCode, TimeSpan? retryDelay = null)
     {
       var code = NormalizeCode(rawCode);
       if (code.Length == 0) return new PairingResult(PairingOutcome.UnknownCode);
@@ -93,9 +111,7 @@ namespace VenueManager
         if (string.IsNullOrEmpty(issued?.Secret))
           return new PairingResult(PairingOutcome.Failed, Detail: "exchange reply had no secret");
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"{root}/me");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", issued.Secret);
-        using var me = await http.SendAsync(request);
+        using var me = await GetMeAsync(http, root, issued.Secret, retryDelay ?? DefaultRetryDelay);
         if (!me.IsSuccessStatusCode)
           return new PairingResult(PairingOutcome.Failed, Detail: await DescribeAsync("/me", me, issued.Secret.Length));
 
