@@ -13,10 +13,12 @@ namespace VenueManager
     private readonly HttpClient _http;
     private readonly string _root;
     private readonly string _secret;
+    private readonly TimeSpan _settle;
     private int? _personId;
 
-    public XvmApiWrites(HttpClient http, string baseUrl, string secret)
+    public XvmApiWrites(HttpClient http, string baseUrl, string secret, TimeSpan? settle = null)
     {
+      _settle = settle ?? TimeSpan.FromMilliseconds(300);
       _http = http;
       _root = baseUrl.Trim().TrimEnd('/');
       _secret = secret;
@@ -35,6 +37,7 @@ namespace VenueManager
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _secret);
         if (body is not null) request.Content = JsonContent.Create(body, body.GetType());
         using var response = await _http.SendAsync(request);
+        if (response.IsSuccessStatusCode && method != HttpMethod.Get) await Task.Delay(_settle);
         return new Reply(response.IsSuccessStatusCode, (int)response.StatusCode, await response.Content.ReadAsStringAsync());
       }
       catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)

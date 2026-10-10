@@ -28,7 +28,7 @@ public class XvmApiWritesTests
         }
     }
 
-    private static XvmApiWrites Writes(Handler handler) => new(new HttpClient(handler), "https://api.test/", "s3cret");
+    private static XvmApiWrites Writes(Handler handler) => new(new HttpClient(handler), "https://api.test/", "s3cret", TimeSpan.Zero);
 
     private static JsonElement Json(string body) => JsonDocument.Parse(body).RootElement;
 
