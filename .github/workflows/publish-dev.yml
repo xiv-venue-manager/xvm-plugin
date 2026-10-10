@@ -24,6 +24,13 @@ jobs:
       - name: Run tests
         run: dotnet test VenueManager.Tests
 
+      - name: Fetch Dalamud
+        run: |
+          url=$(curl -sSf "https://kamori.goats.dev/Dalamud/Release/VersionInfo?track=stg" | jq -r .downloadUrl)
+          mkdir -p "$HOME/.xlcore/dalamud/Hooks/dev"
+          curl -sSfL "$url" -o "$RUNNER_TEMP/dalamud.zip"
+          unzip -q "$RUNNER_TEMP/dalamud.zip" -d "$HOME/.xlcore/dalamud/Hooks/dev"
+
       - name: Build Dev package
         run: scripts/build-dev-package.sh "$RUNNER_TEMP/stage"
 
