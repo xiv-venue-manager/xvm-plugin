@@ -650,6 +650,7 @@ public class SettingsTab : ITab
           this.configuration.Save();
           // Separate from Configuration so other code paths get a single source of truth that updates instantly
           plugin.currentXivAppVenueId = venue.Id;
+          plugin.ResetShiftForVenueChange();
           _ = LoadVenueDataWithFeedbackAsync(venue.Id, venue.Name);
         }
         if (isSelected)

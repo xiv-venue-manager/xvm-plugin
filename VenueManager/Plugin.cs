@@ -241,6 +241,7 @@ namespace VenueManager
 
         if (venueId == currentXivAppVenueId) return;
         currentXivAppVenueId = venueId;
+        ResetShiftForVenueChange();
         Configuration.selectedVenueId = venueId;
         Configuration.Save();
         await LoadVenueDataAsync(venueId);
@@ -735,6 +736,12 @@ namespace VenueManager
 
     // Forces a fresh shift poll next tick so the DTR label updates within one frame of a clock action
     public void InvalidateShiftPollCache() => lastShiftPollMs = 0;
+
+    public void ResetShiftForVenueChange()
+    {
+      activeShift = null;
+      InvalidateShiftPollCache();
+    }
 
     private void DrawUI()
     {
