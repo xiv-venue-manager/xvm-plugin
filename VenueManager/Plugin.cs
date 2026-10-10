@@ -98,7 +98,7 @@ namespace VenueManager
       if (string.IsNullOrEmpty(currentXivAppVenueId)) return null;
       var venue = xivAppVenues.Find(v => v.Id == currentXivAppVenueId);
       if (venue == null || string.IsNullOrEmpty(venue.Slug)) return null;
-      var baseUrl = Configuration.xivAppServerUrl.TrimEnd('/');
+      const string baseUrl = "https://xivvenuemanager.com";
       var path = $"/dashboard/{venue.Slug}";
       if (!string.IsNullOrEmpty(subpath))
         path += "/" + subpath.TrimStart('/');
@@ -175,11 +175,6 @@ namespace VenueManager
       xivAppClient = new XIVAppApiClient();
       if (!string.IsNullOrEmpty(Configuration.xvmApiSecret))
           xivAppClient.ConfigureXvm(Configuration.xvmApiUrl, Configuration.xvmApiSecret);
-      if (!string.IsNullOrEmpty(Configuration.xivAppApiKey))
-      {
-          xivAppClient.Configure(Configuration.xivAppApiKey, Configuration.xivAppServerUrl);
-          Log.Information("XIV-App API Client configured with server: {0}", Configuration.xivAppServerUrl);
-      }
       if (xivAppClient.IsConfigured)
       {
           // Fire-and-forget: a server outage at launch must not block plugin init
@@ -265,7 +260,6 @@ namespace VenueManager
       PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUI;
       ClientState.Logout -= OnLogout;
       LifestreamIpc?.Dispose();
-      xivAppClient?.Dispose();
 
       Framework.Update -= OnFrameworkUpdate;
       ClientState.TerritoryChanged -= OnTerritoryChanged;
@@ -1402,7 +1396,6 @@ namespace VenueManager
     public void TryLogPatronVisit(string characterName, string worldName, string action)
     {
       if (!Configuration.syncToXivApp) return;
-      if (string.IsNullOrEmpty(Configuration.xivAppApiKey)) return;
       if (xivAppClient == null || !xivAppClient.IsConfigured) return;
       if (string.IsNullOrEmpty(characterName) || string.IsNullOrEmpty(worldName)) return;
 

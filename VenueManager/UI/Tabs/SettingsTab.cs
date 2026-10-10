@@ -43,9 +43,7 @@ public class SettingsTab : ITab
   private Vector4 xivAppStatusColor = Colors.XivOverlay0;
 
   // Not persisted; default hidden so screenshots/shares don't leak the key
-  private bool showApiKey = false;
 
-  private const string DefaultServerUrl = "https://xivvenuemanager.com";
 
   private static Vector4 StatusOk   => Colors.StatusOk;
   private static Vector4 StatusWarn => Colors.StatusWarn;
@@ -62,7 +60,7 @@ public class SettingsTab : ITab
     ImGui.BeginChild("SettingsRoot");
     ImGui.Indent(5);
 
-    if (string.IsNullOrEmpty(this.configuration.xivAppApiKey))
+    if (string.IsNullOrEmpty(this.configuration.xvmApiSecret))
       DrawWelcomeBanner();
 
     // Primary workflow — surface first so a fresh install lands on the setup it needs
@@ -469,16 +467,16 @@ public class SettingsTab : ITab
       ImGuiInputTextFlags.ReadOnly);
   }
 
-  // -- Welcome banner (first-run, no API key) --------------------------------
+  // -- Welcome banner (first-run, account not linked) --------------------------------
 
   private void DrawWelcomeBanner()
   {
     ImGui.TextColored(Colors.XivGreen, "Welcome to XIV Venue Manager Sync!");
-    ImGui.TextWrapped("To get started, you'll need an API key from xivvenuemanager.com.");
+    ImGui.TextWrapped("To get started, link the plugin to your xivvenuemanager.com account.");
     ImGui.Spacing();
     ImGui.TextWrapped("1. Log in with Discord at xivvenuemanager.com");
-    ImGui.TextWrapped("2. Open your venue dashboard, click Settings in the left sidebar (not the top-right account menu), go to API Keys and create a key");
-    ImGui.TextWrapped("3. Paste it into the API Key field below");
+    ImGui.TextWrapped("2. Open the Dashboard, go to API Keys and press Generate link code");
+    ImGui.TextWrapped("3. Type the code into Link code below and press Link");
     ImGui.Spacing();
     if (ImGui.Button("Open xivvenuemanager.com"))
       Util.OpenLink("https://xivvenuemanager.com");
@@ -506,7 +504,11 @@ public class SettingsTab : ITab
         this.configuration.Save();
         plugin.xivAppClient?.ClearXvm();
         linkStatus = "";
+        return;
       }
+      ImGui.Spacing();
+      DrawFetchVenuesButton();
+      DrawVenueSelector();
       ImGui.Spacing();
       return;
     }
@@ -570,70 +572,6 @@ public class SettingsTab : ITab
       ImGui.SetTooltip("Sync patron visits to XIV-App website");
     }
 
-    if (!this.configuration.syncToXivApp) ImGui.BeginDisabled();
-
-    ImGui.Indent(10);
-
-    DrawApiKeyInput();
-    DrawServerUrlInput();
-    DrawFetchVenuesButton();
-    DrawVenueSelector();
-
-    ImGui.Unindent(10);
-
-    if (!this.configuration.syncToXivApp) ImGui.EndDisabled();
-  }
-
-  // Trim on every keystroke — stray whitespace/newlines from Discord copy-paste otherwise throw in HttpClient.DefaultRequestHeaders.Add
-  private void DrawApiKeyInput()
-  {
-    var apiKey = this.configuration.xivAppApiKey ?? "";
-    var flags = showApiKey ? ImGuiInputTextFlags.None : ImGuiInputTextFlags.Password;
-    if (ImGui.InputText("API Key", ref apiKey, 128, flags))
-    {
-      this.configuration.xivAppApiKey = apiKey.Trim();
-      this.configuration.Save();
-      ReconfigureXivAppClient();
-    }
-    // Auto-fetch on blur so paste + click-elsewhere is enough, no separate Fetch Venues click required
-    if (ImGui.IsItemDeactivatedAfterEdit() && !string.IsNullOrEmpty(this.configuration.xivAppApiKey))
-    {
-      _ = FetchXivAppVenuesAsync();
-    }
-    ImGui.SameLine();
-    if (ImGuiComponents.IconButton(showApiKey ? FontAwesomeIcon.EyeSlash : FontAwesomeIcon.Eye))
-    {
-      showApiKey = !showApiKey;
-    }
-    if (ImGui.IsItemHovered())
-    {
-      ImGui.SetTooltip(showApiKey ? "Hide API key" : "Show API key");
-    }
-
-    // Warn not error — user is mid-entry, nothing has failed yet
-    if (!string.IsNullOrEmpty(this.configuration.xivAppApiKey) && !this.configuration.xivAppApiKey.StartsWith("vm_"))
-    {
-      ImGui.TextColored(StatusWarn, "Key must start with 'vm_' — generate one at xivvenuemanager.com/dashboard/api-keys.");
-    }
-  }
-
-  private void DrawServerUrlInput()
-  {
-    var serverUrl = this.configuration.xivAppServerUrl ?? "";
-    if (ImGui.InputTextWithHint("Server URL", DefaultServerUrl, ref serverUrl, 256))
-    {
-      this.configuration.xivAppServerUrl = serverUrl.Trim();
-      this.configuration.Save();
-      ReconfigureXivAppClient();
-    }
-    if (ImGui.IsItemHovered())
-    {
-      ImGui.SetTooltip($"Leave blank to use the default ({DefaultServerUrl}). Override only for self-hosted instances.");
-    }
-    if (ImGui.IsItemDeactivatedAfterEdit() && !string.IsNullOrEmpty(this.configuration.xivAppApiKey))
-    {
-      _ = FetchXivAppVenuesAsync();
-    }
   }
 
   private void DrawFetchVenuesButton()
@@ -644,7 +582,7 @@ public class SettingsTab : ITab
     }
     if (ImGui.IsItemHovered())
     {
-      ImGui.SetTooltip("Refresh the list of venues your API key has access to. The plugin fetches automatically when you finish editing the key or URL, so you only need this after changing permissions on the website.");
+      ImGui.SetTooltip("Refresh the list of venues your linked account can use. The plugin fetches when you link, so you only need this after your venue access changes on the website.");
     }
     // Reserve the row either way so appearing/disappearing text doesn't shove the section
     if (!string.IsNullOrEmpty(xivAppStatus))
@@ -728,27 +666,6 @@ public class SettingsTab : ITab
     xivAppStatusColor = StatusOk;
   }
 
-  // Client is always non-null (created at Plugin load) — callers don't need null checks, just IsConfigured
-  private void ReconfigureXivAppClient()
-  {
-    if (plugin.xivAppClient == null) return;
-    if (string.IsNullOrEmpty(this.configuration.xivAppApiKey)) return;
-    try
-    {
-      // Fall back to the public host when blank — users leaving the hint in place expect it to "just work"
-      var url = string.IsNullOrWhiteSpace(this.configuration.xivAppServerUrl)
-        ? DefaultServerUrl
-        : this.configuration.xivAppServerUrl;
-      plugin.xivAppClient.Configure(this.configuration.xivAppApiKey, url);
-    }
-    catch (Exception ex)
-    {
-      xivAppStatus = $"Invalid key or URL: {ex.Message}";
-      xivAppStatusColor = StatusErr;
-      Plugin.Log.Error("XIV-App Configure failed: {0}", ex.Message);
-    }
-  }
-
   private async Task FetchXivAppVenuesAsync()
   {
     try {
@@ -757,11 +674,6 @@ public class SettingsTab : ITab
         xivAppStatus = "XIV-App client not initialized — restart the plugin.";
         xivAppStatusColor = StatusErr;
         return;
-      }
-      // Self-heal: key may have been pasted before ReconfigureXivAppClient fired
-      if (!plugin.xivAppClient.IsConfigured && !string.IsNullOrEmpty(this.configuration.xivAppApiKey))
-      {
-        ReconfigureXivAppClient();
       }
       if (!plugin.xivAppClient.IsConfigured)
       {

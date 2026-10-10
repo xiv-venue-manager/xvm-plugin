@@ -91,8 +91,8 @@ public class MainWindow : Window, IDisposable
         using var theme = ThemeManager.Scope();
         try
         {
-            // First-run: no API key → show Settings.
-            if (string.IsNullOrEmpty(configuration.xivAppApiKey))
+            // First-run: account not linked → show Settings.
+            if (string.IsNullOrEmpty(configuration.xvmApiSecret))
                 _currentTab = settingsTab;
 
             drawHeader();

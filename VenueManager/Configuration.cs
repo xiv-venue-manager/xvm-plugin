@@ -54,8 +54,6 @@ namespace VenueManager
     public bool sortCurrentVisitorsTop { get; set; } = true;
 
     // XIV-App API Configuration
-    public string xivAppApiKey { get; set; } = "";
-    public string xivAppServerUrl { get; set; } = "https://xivvenuemanager.com";
     public string selectedVenueId { get; set; } = "";
     public bool syncToXivApp { get; set; } = false;
 
