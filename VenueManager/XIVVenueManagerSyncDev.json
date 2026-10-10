@@ -5,5 +5,10 @@
   "Description": "Test build of the XIV Venue Manager Sync plugin for the dev environment. It connects to dev-api.xivvenuemanager.com and never to the live service. Safe to install next to the normal plugin: it has its own settings, data and commands (/xvmdev).",
   "ApplicableVersion": "any",
   "InternalName": "XIVVenueManagerSyncDev",
-  "Tags": [ "venue", "dev", "testing" ]
+  "Tags": [
+    "venue",
+    "dev",
+    "testing"
+  ],
+  "Changelog": "Dev build: link with a one-time code, setup checklist and character link, automatic venue matching by address, shift prompts, room controls, Bans tab, own leave and already-inside reporting. Only talks to the dev API and dev website."
 }

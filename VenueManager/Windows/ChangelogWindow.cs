@@ -13,6 +13,30 @@ public class ChangelogWindow : Window, IDisposable
 {
     private readonly record struct ChangelogEntry(string Version, string Date, string Tagline, bool IsCurrent, string[] Items);
 
+#if DEV_FLAVOUR
+    private static readonly ChangelogEntry[] Entries =
+    [
+        new("Dev build", "October 2026", "Direct link to the new system", IsCurrent: true,
+        [
+            "This is the test build. It only talks to the dev API and the dev website, never the live ones.",
+            "Link with a one-time code from the dashboard (API Keys, Generate link code). The old API key is no longer used.",
+            "Setup checklist in Settings, plus a Link current character button. Your own visits are not logged until your character is linked.",
+            "Houses, apartments (main and subdivision) and FC houses are matched to your venues by address and saved automatically.",
+            "Shift prompts: a Clock in button when a shift starts and Clock out when it runs past its end. Not now silences a shift. The status bar shows your shift at any venue.",
+            "Rooms: reserve, release, lock, unlock and disable from the Rooms tab. Staff are blocked from locking and disabling, managers are not.",
+            "New Bans tab. Ban alerts and patron tracking keep working with the Patrons tab hidden.",
+            "Your own leave is now reported, and players already inside when you arrive are reported as present.",
+        ]),
+
+        new("Not working yet", "October 2026", "Known gaps", IsCurrent: false,
+        [
+            "Roles and the Inventory tab stay empty until the matching server update is on dev.",
+            "The teleport button does not work for apartments, because Lifestream cannot be given an apartment address.",
+            "Every chamber in an FC house counts as a different house, so chambers are not saved as venues.",
+            "A patron who is still inside when the last staff member leaves stays shown as inside for a while.",
+        ]),
+    ];
+#else
     private static readonly ChangelogEntry[] Entries =
     [
         new("v3.11.0", "August 2026", "Exterior Plot Tracking", IsCurrent: true,
@@ -95,9 +119,14 @@ public class ChangelogWindow : Window, IDisposable
             "Patron sync reliability improvements",
         ]),
     ];
+#endif
 
     public ChangelogWindow() : base(
+#if DEV_FLAVOUR
+        "XIV Venue Manager (Dev) — Changelog###XIVVMChangelog",
+#else
         "XIV Venue Manager — Changelog###XIVVMChangelog",
+#endif
         ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse)
     {
         Size          = new Vector2(540, 620);
