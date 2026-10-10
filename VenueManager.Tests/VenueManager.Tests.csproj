@@ -13,5 +13,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\VenueManager\XvmApiPairing.cs" Link="XvmApiPairing.cs" />
+    <Compile Include="..\VenueManager\XIVAppApiModels.cs" Link="XIVAppApiModels.cs" />
+    <Compile Include="..\VenueManager\XvmApiModels.cs" Link="XvmApiModels.cs" />
+    <Compile Include="..\VenueManager\XvmApiMapping.cs" Link="XvmApiMapping.cs" />
+    <Compile Include="..\VenueManager\XvmApiReads.cs" Link="XvmApiReads.cs" />
   </ItemGroup>
 </Project>
