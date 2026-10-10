@@ -92,6 +92,20 @@ public class XvmApiReadsTests
     }
 
     [Fact]
+    public async Task Venue_addresses_come_from_each_venues_detail()
+    {
+        var handler = new RoutedHandler()
+            .On("/venues/v1", "{\"id\":\"v1\",\"world\":\"Raiden\",\"district\":\"Lavender Beds\",\"ward\":6,\"plot\":6,\"room\":null,\"subdivision\":null}")
+            .On("/venues/v2", "{\"id\":\"v2\",\"world\":\"Raiden\",\"district\":\"Mist\",\"ward\":12,\"plot\":null,\"room\":45,\"subdivision\":true}");
+
+        var addresses = await Reads(handler).GetVenueAddressesAsync(new[] { "v1", "v2" });
+
+        Assert.Equal(2, addresses.Count);
+        Assert.Equal(6, addresses.Single(a => a.VenueId == "v1").Plot);
+        Assert.Equal(true, addresses.Single(a => a.VenueId == "v2").Subdivision);
+    }
+
+    [Fact]
     public async Task Services_join_their_category_names()
     {
         var handler = new RoutedHandler()

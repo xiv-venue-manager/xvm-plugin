@@ -53,6 +53,12 @@ namespace VenueManager
       return XvmApiMapping.MapShifts(mine, open, names);
     }
 
+    internal async Task<List<XvmVenueAddress>> GetVenueAddressesAsync(IEnumerable<string> venueIds)
+    {
+      var rows = await Task.WhenAll(venueIds.Select(id => GetAsync<XvmVenueAddress>(Venue(id))));
+      return rows.Where(r => r is not null).Select(r => r!).ToList();
+    }
+
     public async Task<List<Role>> GetRolesAsync(string venueId)
     {
       var own = await MyVenueAsync(venueId);
