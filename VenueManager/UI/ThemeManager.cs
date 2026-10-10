@@ -164,6 +164,11 @@ public static class ThemeManager
             ConfigBanner(noVenueMessage ?? "No venue selected. Pick one in Settings.");
             return false;
         }
+        if (plugin.CurrentCharacterNeedsLink)
+        {
+            ImGui.TextColored(Colors.XivYellow, "Your current character is not linked, so your own visits are not logged. Link it under Account link in Settings.");
+            ImGui.Spacing();
+        }
         return true;
     }
 

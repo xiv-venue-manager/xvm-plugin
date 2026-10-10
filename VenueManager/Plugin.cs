@@ -83,6 +83,10 @@ namespace VenueManager
     public XIVAppApiClient? xivAppClient;
     public List<XIVAppVenue> xivAppVenues = new();
     internal List<XvmVenueAddress> xivAppVenueAddresses = new();
+    internal List<XvmCharacter> myCharacters = new();
+    internal volatile bool charactersLoaded = false;
+    private (string Name, string World)? currentCharacterCache;
+    private long currentCharacterCachedAt = -10_000;
     private DateTime venueAddressesLoadedAt = DateTime.MinValue;
     public List<Role> xivAppRoles = new();
     public List<Service> availableServices = new();
@@ -121,6 +125,7 @@ namespace VenueManager
         Log.Information("Auto-loaded {Count} venue(s) on startup", xivAppVenues.Count);
         if (xivAppVenues.Count == 0) return;
         await LoadVenueAddressesAsync();
+        await LoadCharactersAsync();
 
         // Mirrors the manual Fetch button's selection logic
         var preferred = xivAppVenues.FirstOrDefault(v => v.Id == Configuration.selectedVenueId);
@@ -151,6 +156,48 @@ namespace VenueManager
       xivAppBannedPatronsUnavailable = bannedPatrons == null;
       xivAppInventoryEnabled = await xivAppClient.Venue.GetInventoryEnabledAsync(venueId);
       Log.Information("Loaded venue {VenueId}: {Roles} roles, {Services} services, {Banned} banned", venueId, xivAppRoles.Count, availableServices.Count, xivAppBannedPatrons.Count);
+    }
+
+    internal (string Name, string World)? CurrentCharacter()
+    {
+      var nowMs = Environment.TickCount64;
+      if (nowMs - currentCharacterCachedAt < 1000) return currentCharacterCache;
+      currentCharacterCachedAt = nowMs;
+      currentCharacterCache = null;
+      if (Objects.Length > 0 && Objects[0] is IPlayerCharacter self)
+      {
+        var player = Player.fromCharacter(self);
+        if (!string.IsNullOrEmpty(player.Name) && !string.IsNullOrEmpty(player.WorldName))
+          currentCharacterCache = (player.Name, player.WorldName);
+      }
+      return currentCharacterCache;
+    }
+
+    private static bool SameText(string a, string b) => string.Equals(a.Trim(), b.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    internal bool CharacterIsLinked(string name, string world) =>
+      myCharacters.Any(c => SameText(c.CharacterName, name) && SameText(c.World, world));
+
+    internal bool CurrentCharacterNeedsLink =>
+      charactersLoaded && xivAppClient?.IsConfigured == true && CurrentCharacter() is { } me && !CharacterIsLinked(me.Name, me.World);
+
+    private bool IsOwnUnlinkedCharacter(string name, string world) =>
+      charactersLoaded && CurrentCharacter() is { } me && SameText(me.Name, name) && SameText(me.World, world) && !CharacterIsLinked(name, world);
+
+    public async Task<bool> LoadCharactersAsync()
+    {
+      if (xivAppClient?.Xvm is not { } xvm) return false;
+      try
+      {
+        myCharacters = await xvm.GetMyCharactersAsync();
+        charactersLoaded = true;
+        return true;
+      }
+      catch (Exception ex)
+      {
+        Log.Warning("Character list load failed: {0}", ex.Message);
+        return false;
+      }
     }
 
     internal static HouseAddress AddressOf(Venue house) =>
@@ -1550,6 +1597,7 @@ namespace VenueManager
       if (!Configuration.syncToXivApp) return;
       if (xivAppClient == null || !xivAppClient.IsConfigured) return;
       if (string.IsNullOrEmpty(characterName) || string.IsNullOrEmpty(worldName)) return;
+      if (IsOwnUnlinkedCharacter(characterName, worldName)) return;
 
       var houseId = pluginState.currentHouse.houseId;
       if (houseId == 0) return;
