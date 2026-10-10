@@ -61,42 +61,6 @@ namespace VenueManager
     public string? UserRole { get; set; }
   }
 
-  public class XIVAppLinkItemRequest
-  {
-    [JsonPropertyName("venueId")]
-    public string VenueId { get; set; } = "";
-
-    [JsonPropertyName("serviceId")]
-    public string ServiceId { get; set; } = "";
-
-    [JsonPropertyName("itemId")]
-    public int ItemId { get; set; }
-
-    [JsonPropertyName("itemName")]
-    public string ItemName { get; set; } = "";
-
-    [JsonPropertyName("iconId")]
-    public int? IconId { get; set; }
-  }
-
-  public class XIVAppRestockRequest
-  {
-    [JsonPropertyName("venueId")]
-    public string VenueId { get; set; } = "";
-
-    [JsonPropertyName("serviceId")]
-    public string ServiceId { get; set; } = "";
-
-    [JsonPropertyName("stockCount")]
-    public int StockCount { get; set; }
-  }
-
-  public class XIVAppInventorySettingsResponse
-  {
-    [JsonPropertyName("enabled")]
-    public bool Enabled { get; set; }
-  }
-
   public class Role
   {
     [JsonPropertyName("id")]
@@ -104,12 +68,6 @@ namespace VenueManager
 
     [JsonPropertyName("name")]
     public string Name { get; set; } = "";
-  }
-
-  public class RolesResponse
-  {
-    [JsonPropertyName("roles")]
-    public List<Role> Roles { get; set; } = new();
   }
 
   public class BannedPatron
@@ -122,12 +80,6 @@ namespace VenueManager
 
     [JsonPropertyName("reason")]
     public string Reason { get; set; } = "";
-  }
-
-  public class BannedPatronsResponse
-  {
-    [JsonPropertyName("bannedPatrons")]
-    public List<BannedPatron> BannedPatrons { get; set; } = new();
   }
 
   public class Room
@@ -154,55 +106,6 @@ namespace VenueManager
     public int RoomNumber { get; set; }
   }
 
-  public class RoomsResponse
-  {
-    [JsonPropertyName("rooms")]
-    public List<Room> Rooms { get; set; } = new();
-  }
-
-  public class XIVAppSetRoomStatusRequest
-  {
-    [JsonPropertyName("venueId")]
-    public string VenueId { get; set; } = "";
-
-    [JsonPropertyName("roomId")]
-    public string RoomId { get; set; } = "";
-
-    [JsonPropertyName("isOccupied")]
-    public bool IsOccupied { get; set; }
-
-    [JsonPropertyName("note")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Note { get; set; }
-  }
-
-  public class ReserveRoomRequest
-  {
-    [JsonPropertyName("venueId")]
-    public string VenueId { get; set; } = "";
-
-    [JsonPropertyName("roomId")]
-    public string RoomId { get; set; } = "";
-
-    [JsonPropertyName("durationMinutes")]
-    public int DurationMinutes { get; set; }
-  }
-
-  public class ReleaseRoomRequest
-  {
-    [JsonPropertyName("venueId")]
-    public string VenueId { get; set; } = "";
-
-    [JsonPropertyName("roomId")]
-    public string RoomId { get; set; } = "";
-  }
-
-  public class XIVAppVenuesResponse
-  {
-    [JsonPropertyName("venues")]
-    public List<XIVAppVenue> Venues { get; set; } = new();
-  }
-
   public class ActiveEventResponse
   {
     [JsonPropertyName("active")]
@@ -218,105 +121,11 @@ namespace VenueManager
     public string? Status { get; set; }
   }
 
-  public class XIVAppPatronVisitRequest
-  {
-    [JsonPropertyName("venueId")]
-    public string VenueId { get; set; } = "";
-
-    [JsonPropertyName("characterName")]
-    public string CharacterName { get; set; } = "";
-
-    [JsonPropertyName("world")]
-    public string World { get; set; } = "";
-
-    [JsonPropertyName("action")]
-    public string Action { get; set; } = "";
-
-    [JsonPropertyName("timestamp")]
-    public string Timestamp { get; set; } = "";
-  }
-
-  public class XIVAppServiceRequest
-  {
-    [JsonPropertyName("venueId")]
-    public string VenueId { get; set; } = "";
-
-    [JsonPropertyName("guestName")]
-    public string GuestName { get; set; } = "";
-
-    [JsonPropertyName("amount")]
-    public int Amount { get; set; }
-
-    [JsonPropertyName("notes")]
-    public string? Notes { get; set; }
-  }
-
-  public class XIVAppTransactionRequest
-  {
-    [JsonPropertyName("venueId")]
-    public string VenueId { get; set; } = "";
-
-    // Server uses zod .optional() which accepts string|undefined but NOT
-    // null. System.Text.Json default-serializes null as literal `null`,
-    // which zod rejects ("Expected string, received null"). Omit the
-    // property entirely when null so the server sees it as undefined.
-    [JsonPropertyName("serviceId")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? ServiceId { get; set; }
-
-    [JsonPropertyName("amount")]
-    public decimal Amount { get; set; }
-
-    [JsonPropertyName("customerName")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? CustomerName { get; set; }
-
-    [JsonPropertyName("notes")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Notes { get; set; }
-
-    // Server's zod schema is optional().default("SALE") - same null-vs-
-    // undefined caveat as the fields above, omit rather than send null.
-    [JsonPropertyName("type")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Type { get; set; }
-  }
-
-  public class XIVAppBanPatronRequest
-  {
-    [JsonPropertyName("venueId")]
-    public string VenueId { get; set; } = "";
-
-    [JsonPropertyName("characterName")]
-    public string CharacterName { get; set; } = "";
-
-    [JsonPropertyName("world")]
-    public string World { get; set; } = "";
-
-    [JsonPropertyName("reason")]
-    public string Reason { get; set; } = "";
-  }
-
   public class LogTransactionResult
   {
     public bool Success { get; set; }
     public string? Error { get; set; }
     public string? ServiceId { get; set; }
-    public int? ServiceStockCount { get; set; }
-  }
-
-  internal class XIVAppTransactionResponse
-  {
-    [JsonPropertyName("transaction")]
-    public XIVAppTransactionResponseData? Transaction { get; set; }
-  }
-
-  internal class XIVAppTransactionResponseData
-  {
-    [JsonPropertyName("serviceId")]
-    public string? ServiceId { get; set; }
-
-    [JsonPropertyName("serviceStockCount")]
     public int? ServiceStockCount { get; set; }
   }
 
