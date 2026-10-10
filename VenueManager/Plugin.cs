@@ -76,8 +76,6 @@ namespace VenueManager
     private volatile bool bannedPollInFlight = false;
     private readonly Dictionary<int, PromptMemory> shiftPromptMemory = new();
     private readonly HashSet<int> mutedShifts = new();
-    private long lastPromptPollMs = 0;
-    private bool promptPollInFlight = false;
     // Non-blocking try-acquire mutex shared by chat-command and UI clock actions
     public readonly SemaphoreSlim clockSem = new SemaphoreSlim(1, 1);
 
@@ -872,9 +870,6 @@ namespace VenueManager
       if (!dtrEntry.Shown) return;
 
       var nowMs = Environment.TickCount64;
-      if (mode == DtrDisplayMode.ShiftStatus || mode == DtrDisplayMode.Combined)
-        PollActiveShiftAsync();
-
       if (!force && nowMs - dtrLastUpdateMs < 2000) return;
       dtrLastUpdateMs = nowMs;
 
@@ -975,40 +970,6 @@ namespace VenueManager
       return $"{(int)t.TotalSeconds}s";
     }
 
-    private void PollShiftPromptsAsync()
-    {
-      if (promptPollInFlight || !Configuration.shiftPrompts) return;
-      var nowMs = Environment.TickCount64;
-      if (nowMs - lastPromptPollMs < 60_000) return;
-      if (xivAppClient?.Xvm is not { } xvm) return;
-
-      lastPromptPollMs = nowMs;
-      promptPollInFlight = true;
-      _ = Task.Run(async () =>
-      {
-        try
-        {
-          var now = DateTime.UtcNow;
-          var shifts = await xvm.GetMyShiftsAsync(now);
-          List<ShiftPrompt> due;
-          lock (mutedShifts) due = ShiftPromptPlanner.Due(now, shifts, shiftPromptMemory, mutedShifts);
-          foreach (var prompt in due)
-          {
-            shiftPromptMemory[prompt.ShiftId] = new PromptMemory(prompt.Kind, now);
-            ShowShiftPrompt(prompt);
-          }
-        }
-        catch (Exception ex)
-        {
-          Log.Warning("Shift prompt poll failed: {0}", ex.Message);
-        }
-        finally
-        {
-          promptPollInFlight = false;
-        }
-      });
-    }
-
     private void ShowShiftPrompt(ShiftPrompt prompt)
     {
       var venueName = xivAppVenues.FirstOrDefault(v => v.Id == prompt.VenueId)?.Name ?? "a venue";
@@ -1094,43 +1055,58 @@ namespace VenueManager
       });
     }
 
-    // Label shows the clocked-in shift at any venue, else the soonest upcoming one; activeShift stays the current venue's for the greeter
-    private void PollActiveShiftAsync()
+    private void PollMyShiftsAsync()
     {
-      if (shiftPollInFlight) return;
+      var wantsLabel = Configuration.dtrDisplayMode is DtrDisplayMode.ShiftStatus or DtrDisplayMode.Combined
+        || Configuration.enableGreeterMode || Configuration.enableReentryGreeter;
+      var wantsPrompts = Configuration.shiftPrompts;
+      if (shiftPollInFlight || (!wantsLabel && !wantsPrompts)) return;
       var nowMs = Environment.TickCount64;
       if (nowMs - lastShiftPollMs < 30_000) return;
       if (xivAppClient?.Xvm is not { } xvm) return;
 
       lastShiftPollMs = nowMs;
       shiftPollInFlight = true;
-      var venueId = currentXivAppVenueId;
       _ = Task.Run(async () =>
       {
         try
         {
           var now = DateTime.UtcNow;
           var all = await xvm.GetMyShiftsAsync(now);
-          if (venueId != currentXivAppVenueId)
-          {
-            lastShiftPollMs = 0;
-            return;
-          }
-          var anywhere = ShiftLabelPicker.Pick(now, all, venueId);
-          var here = string.IsNullOrEmpty(venueId) ? null : ShiftLabelPicker.Pick(now, all.Where(s => s.VenueId == venueId), venueId);
-          activeShift = here is null ? null : ToShiftDto(here);
-          labelShift = anywhere is null ? null : ToShiftDto(anywhere);
-          labelShiftVenueId = anywhere?.VenueId;
+          if (wantsLabel) UpdateShiftLabel(now, all);
+          if (wantsPrompts) ShowDuePrompts(now, all);
         }
         catch (Exception ex)
         {
-          Log.Warning($"DTR shift poll failed: {ex.Message}");
+          Log.Warning("Shift poll failed: {0}", ex.Message);
         }
         finally
         {
           shiftPollInFlight = false;
         }
       });
+    }
+
+    // Label shows the clocked-in shift at any venue, else the soonest upcoming one; activeShift stays the current venue's for the greeter
+    private void UpdateShiftLabel(DateTime now, List<MyShift> all)
+    {
+      var venueId = currentXivAppVenueId;
+      var anywhere = ShiftLabelPicker.Pick(now, all, venueId);
+      var here = string.IsNullOrEmpty(venueId) ? null : ShiftLabelPicker.Pick(now, all.Where(s => s.VenueId == venueId), venueId);
+      activeShift = here is null ? null : ToShiftDto(here);
+      labelShift = anywhere is null ? null : ToShiftDto(anywhere);
+      labelShiftVenueId = anywhere?.VenueId;
+    }
+
+    private void ShowDuePrompts(DateTime now, List<MyShift> all)
+    {
+      List<ShiftPrompt> due;
+      lock (mutedShifts) due = ShiftPromptPlanner.Due(now, all, shiftPromptMemory, mutedShifts);
+      foreach (var prompt in due)
+      {
+        shiftPromptMemory[prompt.ShiftId] = new PromptMemory(prompt.Kind, now);
+        ShowShiftPrompt(prompt);
+      }
     }
 
     private static ShiftDto ToShiftDto(MyShift s)
@@ -1158,7 +1134,7 @@ namespace VenueManager
       {
         UpdateDtrBar();
         PollBannedPatronsAsync();
-        PollShiftPromptsAsync();
+        PollMyShiftsAsync();
 
         // Exterior-entry poll — see ARCHITECTURE.md § Housing/location detection
         if (!pluginState.userInHouse && entryPollStopwatch.ElapsedMilliseconds > 1000)
