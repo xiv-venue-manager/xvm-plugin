@@ -262,6 +262,7 @@ public class SalesTab : ITab
           ? $"Logged {amount}g {verb} from {trimmedName}"
           : $"Logged {amount}g {verb}";
         statusIsError = false;
+        plugin.PrintSaleWarning(result);
         // Reset the parts that should change per sale. Keep service
         // selection so rapid-fire logging of the same item stays one
         // click; clear customer + notes so the next sale doesn't

@@ -601,6 +601,12 @@ namespace VenueManager
       MainWindow.IsOpen = true;
     }
 
+    public void PrintSaleWarning(LogTransactionResult result)
+    {
+      if (result.Warning == null) return;
+      Chat.Print((this.Configuration.showPluginNameInChat ? $"[{Name}] " : "") + result.Warning);
+    }
+
     // Used by `/xvm sale!` — see ARCHITECTURE.md § Slash commands
     // Computes the chat prefix and checks XIV-App is configured with a venue selected,
     // printing the appropriate error and returning false if not ready.
@@ -649,6 +655,7 @@ namespace VenueManager
           Chat.Print(prefix + (trimmedName != null
             ? $"Logged {amount}g{suffix} from {trimmedName}"
             : $"Logged {amount}g{suffix}"));
+          PrintSaleWarning(result);
         }
         else
         {
