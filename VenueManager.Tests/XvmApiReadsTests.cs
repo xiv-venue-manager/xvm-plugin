@@ -169,15 +169,17 @@ public class XvmApiReadsTests
     }
 
     [Fact]
-    public async Task Inventory_follows_the_venues_inventory_enabled_flag()
+    public async Task Inventory_follows_the_venues_inventory_module()
     {
         var handler = new RoutedHandler()
-            .On("/me/venues", "[{\"venue\":{\"id\":\"v1\",\"name\":\"Lotus\",\"slug\":\"lotus\",\"inventory_enabled\":true},\"tier\":\"staff\",\"effective_tier\":\"staff\",\"membership_id\":7,\"position_ids\":[]},{\"venue\":{\"id\":\"v2\",\"name\":\"Moon\",\"slug\":\"moon\"},\"tier\":\"owner\",\"effective_tier\":\"owner\",\"membership_id\":8,\"position_ids\":[]}]");
+            .On("/venues/v1/modules", "[{\"module\":\"rooms\",\"enabled\":true},{\"module\":\"inventory\",\"enabled\":true}]")
+            .On("/venues/v2/modules", "[{\"module\":\"rooms\",\"enabled\":true},{\"module\":\"inventory\",\"enabled\":false}]")
+            .On("/venues/v3/modules", "[{\"module\":\"rooms\",\"enabled\":true}]");
         var reads = Reads(handler);
 
         Assert.True(await reads.GetInventoryEnabledAsync("v1"));
         Assert.False(await reads.GetInventoryEnabledAsync("v2"));
-        Assert.False(await reads.GetInventoryEnabledAsync("unknown"));
+        Assert.False(await reads.GetInventoryEnabledAsync("v3"));
     }
 
     [Fact]
