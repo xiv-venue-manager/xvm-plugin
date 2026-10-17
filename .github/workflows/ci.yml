@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Dalamud.NET.Sdk compiles against Dalamud's own assemblies and reads their folder from
+      # DALAMUD_HOME. The published build is all it needs; the game is not involved.
+      - name: Download Dalamud
+        run: |
+          mkdir -p "$RUNNER_TEMP/dalamud"
+          curl -fsSL -o "$RUNNER_TEMP/dalamud.zip" https://goatcorp.github.io/dalamud-distrib/latest.zip
+          unzip -q "$RUNNER_TEMP/dalamud.zip" -d "$RUNNER_TEMP/dalamud"
+          echo "DALAMUD_HOME=$RUNNER_TEMP/dalamud" >> "$GITHUB_ENV"
+
+      - name: Restore
+        run: dotnet restore VenueManager.sln --locked-mode
+
+      - name: Build (Release)
+        run: dotnet build VenueManager.sln --configuration Release --no-restore
+
+      # The test project is not in the solution, so dotnet test on the solution would run nothing.
+      # master has none yet; the step switches on when a branch brings VenueManager.Tests.
+      - name: Test
+        if: hashFiles('VenueManager.Tests/VenueManager.Tests.csproj') != ''
+        run: dotnet test VenueManager.Tests/VenueManager.Tests.csproj --configuration Release
+
+      # Testing this plugin means loading it in game, so a reviewer wants the zip, not a log.
+      - name: Upload plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: XIVVenueManagerSync
+          path: VenueManager/bin/x64/Release/XIVVenueManagerSync/XIVVenueManagerSync.zip
+          if-no-files-found: error
+          retention-days: 14
