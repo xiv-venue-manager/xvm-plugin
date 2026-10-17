@@ -33,9 +33,9 @@ public class XvmApiWritesTests
     private static JsonElement Json(string body) => JsonDocument.Parse(body).RootElement;
 
     [Fact]
-    public async Task Claim_posts_to_the_shift_and_reports_the_pending_status()
+    public async Task Claim_joins_the_event_shift_and_reports_the_pending_status()
     {
-        var handler = new Handler().On("POST", "/venues/v1/shifts/42/claim", "{\"status\":\"pending_approval\",\"worked_minutes\":null}");
+        var handler = new Handler().On("POST", "/venues/v1/event-shifts/42/join", "{\"status\":\"pending_approval\",\"worked_minutes\":null}");
 
         var result = await Writes(handler).ClaimShiftAsync("v1", "42");
 
