@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Net.Http;
 using System.Numerics;
 using System.Threading.Tasks;
 using Dalamud.Interface;
@@ -34,12 +35,15 @@ public class SettingsTab : ITab
 
   // Status line under Fetch Venues — set by the async Fetch* methods below
   private string xivAppStatus = "";
+  private static readonly HttpClient XvmHttp = new() { Timeout = TimeSpan.FromSeconds(10) };
+  private string pairingCode = "";
+  private bool linking = false;
+  private string linkStatus = "";
+  private Vector4 linkStatusColor = Colors.StatusWarn;
   private Vector4 xivAppStatusColor = Colors.XivOverlay0;
 
   // Not persisted; default hidden so screenshots/shares don't leak the key
-  private bool showApiKey = false;
 
-  private const string DefaultServerUrl = "https://xivvenuemanager.com";
 
   private static Vector4 StatusOk   => Colors.StatusOk;
   private static Vector4 StatusWarn => Colors.StatusWarn;
@@ -56,10 +60,11 @@ public class SettingsTab : ITab
     ImGui.BeginChild("SettingsRoot");
     ImGui.Indent(5);
 
-    if (string.IsNullOrEmpty(this.configuration.xivAppApiKey))
+    if (string.IsNullOrEmpty(this.configuration.xvmApiSecret))
       DrawWelcomeBanner();
 
     // Primary workflow — surface first so a fresh install lands on the setup it needs
+    DrawAccountLink();
     DrawXivAppSettings();
 
     DrawSectionSeparator();
@@ -73,6 +78,9 @@ public class SettingsTab : ITab
     DrawSectionSeparator();
     DrawSectionHeader("Patron List");
     DrawPatronListSettings();
+
+    DrawSectionSeparator();
+    DrawBanAlerts();
 
     DrawSectionSeparator();
     DrawPatronChatAlerts();
@@ -226,6 +234,21 @@ public class SettingsTab : ITab
   }
 
   // -- Chat Alerts ----------------------------------------------------------
+
+  private void DrawBanAlerts()
+  {
+    DrawSectionHeader("Ban Alerts");
+    var alertBanned = this.configuration.alertBannedPatrons;
+    if (ImGui.Checkbox("Alert when a banned patron arrives", ref alertBanned))
+    {
+      this.configuration.alertBannedPatrons = alertBanned;
+      this.configuration.Save();
+    }
+    if (ImGui.IsItemHovered())
+    {
+      ImGui.SetTooltip("Shows a chat warning with the ban reason. Works even if chat alerts, snooze or the Patrons tab are turned off.");
+    }
+  }
 
   private void DrawPatronChatAlerts()
   {
@@ -462,16 +485,16 @@ public class SettingsTab : ITab
       ImGuiInputTextFlags.ReadOnly);
   }
 
-  // -- Welcome banner (first-run, no API key) --------------------------------
+  // -- Welcome banner (first-run, account not linked) --------------------------------
 
   private void DrawWelcomeBanner()
   {
     ImGui.TextColored(Colors.XivGreen, "Welcome to XIV Venue Manager Sync!");
-    ImGui.TextWrapped("To get started, you'll need an API key from xivvenuemanager.com.");
+    ImGui.TextWrapped("To get started, link the plugin to your xivvenuemanager.com account.");
     ImGui.Spacing();
     ImGui.TextWrapped("1. Log in with Discord at xivvenuemanager.com");
-    ImGui.TextWrapped("2. Open your venue dashboard, click Settings in the left sidebar (not the top-right account menu), go to API Keys and create a key");
-    ImGui.TextWrapped("3. Paste it into the API Key field below");
+    ImGui.TextWrapped("2. Open the Dashboard, go to API Keys and press Generate link code");
+    ImGui.TextWrapped("3. Type the code into Link code below and press Link");
     ImGui.Spacing();
     if (ImGui.Button("Open xivvenuemanager.com"))
       Util.OpenLink("https://xivvenuemanager.com");
@@ -481,6 +504,74 @@ public class SettingsTab : ITab
   }
 
   // -- XIV-App Sync ---------------------------------------------------------
+
+  private void DrawAccountLink()
+  {
+    DrawSectionHeader("Account link");
+    ImGui.TextColored(Colors.XivSubtext0, "Link this plugin to your xivvenuemanager.com account with a one-time code.");
+    ImGui.Spacing();
+
+    if (!string.IsNullOrEmpty(this.configuration.xvmApiSecret))
+    {
+      var who = string.IsNullOrEmpty(this.configuration.xvmApiPersonName) ? "your account" : this.configuration.xvmApiPersonName;
+      ImGui.TextColored(StatusOk, $"Linked as {who}");
+      if (ImGui.Button("Unlink"))
+      {
+        this.configuration.xvmApiSecret = "";
+        this.configuration.xvmApiPersonName = "";
+        this.configuration.Save();
+        plugin.xivAppClient?.ClearXvm();
+        linkStatus = "";
+        return;
+      }
+      ImGui.Spacing();
+      DrawFetchVenuesButton();
+      DrawVenueSelector();
+      ImGui.Spacing();
+      return;
+    }
+
+    ImGui.InputTextWithHint("Link code", "ABCD-1234", ref pairingCode, 16);
+    ImGui.SameLine();
+    if (linking) ImGui.BeginDisabled();
+    if (ImGui.Button("Link") && !linking) _ = LinkAccountAsync();
+    if (linking) ImGui.EndDisabled();
+    ImGui.TextDisabled("Get a code at xivvenuemanager.com/dashboard/api-keys.");
+    if (!string.IsNullOrEmpty(linkStatus)) ImGui.TextColored(linkStatusColor, linkStatus);
+    ImGui.Spacing();
+  }
+
+  private async Task LinkAccountAsync()
+  {
+    linking = true;
+    linkStatus = "Linking…";
+    linkStatusColor = StatusWarn;
+    try
+    {
+      var url = string.IsNullOrWhiteSpace(this.configuration.xvmApiUrl) ? XvmApiPairing.DefaultUrl : this.configuration.xvmApiUrl;
+      var result = await XvmApiPairing.LinkAsync(XvmHttp, url, pairingCode);
+      if (result.Success)
+      {
+        this.configuration.xvmApiSecret = result.Secret!;
+        this.configuration.xvmApiPersonName = result.PersonName ?? "";
+        this.configuration.Save();
+        plugin.xivAppClient?.ConfigureXvm(url, result.Secret!);
+        pairingCode = "";
+        linkStatus = "";
+        _ = FetchXivAppVenuesAsync();
+      }
+      else
+      {
+        linkStatus = string.IsNullOrEmpty(result.Detail) ? result.Message : $"{result.Message} ({result.Detail})";
+        linkStatusColor = StatusErr;
+        if (!string.IsNullOrEmpty(result.Detail)) Plugin.Log.Warning("Account link failed: {0}", result.Detail);
+      }
+    }
+    finally
+    {
+      linking = false;
+    }
+  }
 
   public unsafe void DrawXivAppSettings()
   {
@@ -499,70 +590,6 @@ public class SettingsTab : ITab
       ImGui.SetTooltip("Sync patron visits to XIV-App website");
     }
 
-    if (!this.configuration.syncToXivApp) ImGui.BeginDisabled();
-
-    ImGui.Indent(10);
-
-    DrawApiKeyInput();
-    DrawServerUrlInput();
-    DrawFetchVenuesButton();
-    DrawVenueSelector();
-
-    ImGui.Unindent(10);
-
-    if (!this.configuration.syncToXivApp) ImGui.EndDisabled();
-  }
-
-  // Trim on every keystroke — stray whitespace/newlines from Discord copy-paste otherwise throw in HttpClient.DefaultRequestHeaders.Add
-  private void DrawApiKeyInput()
-  {
-    var apiKey = this.configuration.xivAppApiKey ?? "";
-    var flags = showApiKey ? ImGuiInputTextFlags.None : ImGuiInputTextFlags.Password;
-    if (ImGui.InputText("API Key", ref apiKey, 128, flags))
-    {
-      this.configuration.xivAppApiKey = apiKey.Trim();
-      this.configuration.Save();
-      ReconfigureXivAppClient();
-    }
-    // Auto-fetch on blur so paste + click-elsewhere is enough, no separate Fetch Venues click required
-    if (ImGui.IsItemDeactivatedAfterEdit() && !string.IsNullOrEmpty(this.configuration.xivAppApiKey))
-    {
-      _ = FetchXivAppVenuesAsync();
-    }
-    ImGui.SameLine();
-    if (ImGuiComponents.IconButton(showApiKey ? FontAwesomeIcon.EyeSlash : FontAwesomeIcon.Eye))
-    {
-      showApiKey = !showApiKey;
-    }
-    if (ImGui.IsItemHovered())
-    {
-      ImGui.SetTooltip(showApiKey ? "Hide API key" : "Show API key");
-    }
-
-    // Warn not error — user is mid-entry, nothing has failed yet
-    if (!string.IsNullOrEmpty(this.configuration.xivAppApiKey) && !this.configuration.xivAppApiKey.StartsWith("vm_"))
-    {
-      ImGui.TextColored(StatusWarn, "Key must start with 'vm_' — generate one at xivvenuemanager.com/dashboard/api-keys.");
-    }
-  }
-
-  private void DrawServerUrlInput()
-  {
-    var serverUrl = this.configuration.xivAppServerUrl ?? "";
-    if (ImGui.InputTextWithHint("Server URL", DefaultServerUrl, ref serverUrl, 256))
-    {
-      this.configuration.xivAppServerUrl = serverUrl.Trim();
-      this.configuration.Save();
-      ReconfigureXivAppClient();
-    }
-    if (ImGui.IsItemHovered())
-    {
-      ImGui.SetTooltip($"Leave blank to use the default ({DefaultServerUrl}). Override only for self-hosted instances.");
-    }
-    if (ImGui.IsItemDeactivatedAfterEdit() && !string.IsNullOrEmpty(this.configuration.xivAppApiKey))
-    {
-      _ = FetchXivAppVenuesAsync();
-    }
   }
 
   private void DrawFetchVenuesButton()
@@ -573,7 +600,7 @@ public class SettingsTab : ITab
     }
     if (ImGui.IsItemHovered())
     {
-      ImGui.SetTooltip("Refresh the list of venues your API key has access to. The plugin fetches automatically when you finish editing the key or URL, so you only need this after changing permissions on the website.");
+      ImGui.SetTooltip("Refresh the list of venues your linked account can use. The plugin fetches when you link, so you only need this after your venue access changes on the website.");
     }
     // Reserve the row either way so appearing/disappearing text doesn't shove the section
     if (!string.IsNullOrEmpty(xivAppStatus))
@@ -657,27 +684,6 @@ public class SettingsTab : ITab
     xivAppStatusColor = StatusOk;
   }
 
-  // Client is always non-null (created at Plugin load) — callers don't need null checks, just IsConfigured
-  private void ReconfigureXivAppClient()
-  {
-    if (plugin.xivAppClient == null) return;
-    if (string.IsNullOrEmpty(this.configuration.xivAppApiKey)) return;
-    try
-    {
-      // Fall back to the public host when blank — users leaving the hint in place expect it to "just work"
-      var url = string.IsNullOrWhiteSpace(this.configuration.xivAppServerUrl)
-        ? DefaultServerUrl
-        : this.configuration.xivAppServerUrl;
-      plugin.xivAppClient.Configure(this.configuration.xivAppApiKey, url);
-    }
-    catch (Exception ex)
-    {
-      xivAppStatus = $"Invalid key or URL: {ex.Message}";
-      xivAppStatusColor = StatusErr;
-      Plugin.Log.Error("XIV-App Configure failed: {0}", ex.Message);
-    }
-  }
-
   private async Task FetchXivAppVenuesAsync()
   {
     try {
@@ -687,14 +693,9 @@ public class SettingsTab : ITab
         xivAppStatusColor = StatusErr;
         return;
       }
-      // Self-heal: key may have been pasted before ReconfigureXivAppClient fired
-      if (!plugin.xivAppClient.IsConfigured && !string.IsNullOrEmpty(this.configuration.xivAppApiKey))
-      {
-        ReconfigureXivAppClient();
-      }
       if (!plugin.xivAppClient.IsConfigured)
       {
-        xivAppStatus = "Enter your API key first (generate one at xivvenuemanager.com).";
+        xivAppStatus = "Link your account first: Account link above.";
         xivAppStatusColor = StatusWarn;
         return;
       }
@@ -711,6 +712,13 @@ public class SettingsTab : ITab
         xivAppStatusColor = StatusWarn;
         return;
       }
+
+      var known = plugin.xivAppVenues.Select(v => v.Id).ToHashSet();
+      if (!string.IsNullOrEmpty(this.configuration.selectedVenueId) && !known.Contains(this.configuration.selectedVenueId))
+        this.configuration.selectedVenueId = "";
+      foreach (var stale in this.configuration.houseToXivAppVenue.Where(kv => !known.Contains(kv.Value)).Select(kv => kv.Key).ToList())
+        this.configuration.houseToXivAppVenue.Remove(stale);
+      this.configuration.Save();
 
       xivAppStatus = $"✓ Fetched {plugin.xivAppVenues.Count} venue(s)";
       xivAppStatusColor = StatusOk;

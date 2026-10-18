@@ -26,6 +26,7 @@ namespace VenueManager
 
     // Should chat message alerts be printed to the chat
     public bool showChatAlerts { get; set; } = false;
+    public bool alertBannedPatrons { get; set; } = true;
     public bool showChatAlertEntry { get; set; } = true;
     public bool showChatAlertReentry { get; set; } = true;
     public bool showChatAlertLeave { get; set; } = true;
@@ -54,10 +55,12 @@ namespace VenueManager
     public bool sortCurrentVisitorsTop { get; set; } = true;
 
     // XIV-App API Configuration
-    public string xivAppApiKey { get; set; } = "";
-    public string xivAppServerUrl { get; set; } = "https://xivvenuemanager.com";
     public string selectedVenueId { get; set; } = "";
     public bool syncToXivApp { get; set; } = false;
+
+    public string xvmApiUrl { get; set; } = XvmApiPairing.DefaultUrl;
+    public string xvmApiSecret { get; set; } = "";
+    public string xvmApiPersonName { get; set; } = "";
 
     // Maps in-game HouseId → xiv-app venueId so patron visits log to the
     // right venue automatically. Populated from the VenuesTab linking UI.

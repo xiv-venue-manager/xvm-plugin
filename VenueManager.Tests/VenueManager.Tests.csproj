@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\VenueManager\XvmApiPairing.cs" Link="XvmApiPairing.cs" />
+    <Compile Include="..\VenueManager\XIVAppApiModels.cs" Link="XIVAppApiModels.cs" />
+    <Compile Include="..\VenueManager\XvmApiModels.cs" Link="XvmApiModels.cs" />
+    <Compile Include="..\VenueManager\XvmApiMapping.cs" Link="XvmApiMapping.cs" />
+    <Compile Include="..\VenueManager\XvmApiReads.cs" Link="XvmApiReads.cs" />
+    <Compile Include="..\VenueManager\XvmApiWriteModels.cs" Link="XvmApiWriteModels.cs" />
+    <Compile Include="..\VenueManager\XvmApiErrors.cs" Link="XvmApiErrors.cs" />
+    <Compile Include="..\VenueManager\XvmApiWrites.cs" Link="XvmApiWrites.cs" />
+  </ItemGroup>
+</Project>

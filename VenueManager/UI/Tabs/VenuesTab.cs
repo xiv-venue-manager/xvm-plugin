@@ -270,8 +270,8 @@ public class VenuesTab : ITab
     if (venues == null || venues.Count == 0)
     {
       ImGui.BeginDisabled();
-      string placeholder = string.IsNullOrEmpty(config.xivAppApiKey)
-        ? "(sign in under Settings)"
+      string placeholder = string.IsNullOrEmpty(config.xvmApiSecret)
+        ? "(link your account under Settings)"
         : "(fetch venues first)";
       ImGui.InputText($"##xivapplink_{houseId}", ref placeholder, 64, ImGuiInputTextFlags.ReadOnly);
       ImGui.EndDisabled();

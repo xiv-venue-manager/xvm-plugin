@@ -98,7 +98,7 @@ namespace VenueManager
       if (string.IsNullOrEmpty(currentXivAppVenueId)) return null;
       var venue = xivAppVenues.Find(v => v.Id == currentXivAppVenueId);
       if (venue == null || string.IsNullOrEmpty(venue.Slug)) return null;
-      var baseUrl = Configuration.xivAppServerUrl.TrimEnd('/');
+      const string baseUrl = "https://xivvenuemanager.com";
       var path = $"/dashboard/{venue.Slug}";
       if (!string.IsNullOrEmpty(subpath))
         path += "/" + subpath.TrimStart('/');
@@ -173,11 +173,10 @@ namespace VenueManager
 
       // Always instantiated so the Settings tab can lazy-configure it on paste — see ARCHITECTURE.md § Startup/configuration
       xivAppClient = new XIVAppApiClient();
-      if (!string.IsNullOrEmpty(Configuration.xivAppApiKey))
+      if (!string.IsNullOrEmpty(Configuration.xvmApiSecret))
+          xivAppClient.ConfigureXvm(Configuration.xvmApiUrl, Configuration.xvmApiSecret);
+      if (xivAppClient.IsConfigured)
       {
-          xivAppClient.Configure(Configuration.xivAppApiKey, Configuration.xivAppServerUrl);
-          Log.Information("XIV-App API Client configured with server: {0}", Configuration.xivAppServerUrl);
-
           // Fire-and-forget: a server outage at launch must not block plugin init
           _ = AutoLoadXivAppDataAsync();
       }
@@ -261,7 +260,6 @@ namespace VenueManager
       PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUI;
       ClientState.Logout -= OnLogout;
       LifestreamIpc?.Dispose();
-      xivAppClient?.Dispose();
 
       Framework.Update -= OnFrameworkUpdate;
       ClientState.TerritoryChanged -= OnTerritoryChanged;
@@ -576,7 +574,7 @@ namespace VenueManager
             return;
           }
 
-          var result = await xivAppClient.Shift.ClockInAsync(scheduled.Id);
+          var result = await xivAppClient.Shift.ClockInAsync(currentXivAppVenueId, scheduled.Id);
           if (result.Success)
           {
             Chat.Print(prefix + "Clocked in. Shift is now active.");
@@ -611,7 +609,7 @@ namespace VenueManager
             return;
           }
 
-          var result = await xivAppClient.Shift.ClockOutAsync(active.Id);
+          var result = await xivAppClient.Shift.ClockOutAsync(currentXivAppVenueId, active.Id);
           if (result.Success)
           {
             var hoursMsg = result.HoursWorked.HasValue
@@ -1097,9 +1095,10 @@ namespace VenueManager
                       "Occupied" => $"Room {pluginState.currentHouse.room}: Occupied",
                       "Locked" => $"Room {pluginState.currentHouse.room}: Locked",
                       "Disabled" => $"Room {pluginState.currentHouse.room}: Disabled",
-                      _ => $"Room {pluginState.currentHouse.room}: Free - open plugin to reserve",
+                      _ when MainWindow.Instance?.RoomsLoaded == true => $"Room {pluginState.currentHouse.room}: not set up for this venue",
+                      _ => null,
                     };
-                    Chat.Print($"[{Name}] {msg}");
+                    if (msg != null) Chat.Print($"[{Name}] {msg}");
                   }
                 }
 
@@ -1301,6 +1300,22 @@ namespace VenueManager
           SendGameChat($"/tell {player.Name}@{player.WorldName} {Configuration.reentryGreeterMessage}");
       }
 
+      if (Configuration.alertBannedPatrons && isBannedPatron(player))
+      {
+        var banned = xivAppBannedPatrons.First(v => v.CharacterName == player.Name && v.World == player.WorldName);
+        var alert = new SeStringBuilder();
+        if (this.Configuration.showPluginNameInChat) alert.AddText($"[{Name}] ");
+        alert.AddText("⚠ BANNED ");
+        alert.AddUiForeground(Colors.getChatColor(player, true));
+        alert.Add(new PlayerPayload(player.Name, player.homeWorld));
+        alert.AddUiForegroundOff();
+        alert.AddText(justEnteredHouse ? " is already inside " : " has entered ");
+        alert.AddText(venueList.venues[pluginState.currentHouse.houseId].name);
+        if (!string.IsNullOrEmpty(banned.Reason)) alert.AddText($" ({banned.Reason})");
+        Chat.Print(new XivChatEntry() { Message = alert.Build() });
+        return;
+      }
+
       if (pluginState.snoozed) return;
       if (!Configuration.showChatAlerts) return;
 
@@ -1398,7 +1413,6 @@ namespace VenueManager
     public void TryLogPatronVisit(string characterName, string worldName, string action)
     {
       if (!Configuration.syncToXivApp) return;
-      if (string.IsNullOrEmpty(Configuration.xivAppApiKey)) return;
       if (xivAppClient == null || !xivAppClient.IsConfigured) return;
       if (string.IsNullOrEmpty(characterName) || string.IsNullOrEmpty(worldName)) return;
 
