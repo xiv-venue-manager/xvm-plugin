@@ -161,18 +161,22 @@ public class VenuesTab : ITab
 
         ImGui.TableNextColumn();
         var lifestream = plugin.LifestreamIpc;
-        if (!lifestream.IsAvailable) ImGui.BeginDisabled();
+        bool isApartment = venue.Value.plot <= 0;
+        bool canTeleport = lifestream.IsAvailable && !isApartment;
+        if (!canTeleport) ImGui.BeginDisabled();
         if (ImGuiComponents.IconButton("##Teleport" + venue.Value.houseId, FontAwesomeIcon.MapMarkerAlt))
         {
           lifestream.TeleportToVenue(venue.Value);
         }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
         {
-          ImGui.SetTooltip(lifestream.IsAvailable
-            ? $"Teleport to {venue.Value.name} (via Lifestream)"
-            : "Requires Lifestream plugin");
+          ImGui.SetTooltip(!lifestream.IsAvailable
+            ? "Requires Lifestream plugin"
+            : isApartment
+              ? "Lifestream cannot be given an apartment address, so use its own address book for this one"
+              : $"Teleport to {venue.Value.name} (via Lifestream)");
         }
-        if (!lifestream.IsAvailable) ImGui.EndDisabled();
+        if (!canTeleport) ImGui.EndDisabled();
 
         ImGui.TableNextColumn();
         if (ImGuiComponents.IconButton("##Copy" + venue.Value.houseId, FontAwesomeIcon.Copy))

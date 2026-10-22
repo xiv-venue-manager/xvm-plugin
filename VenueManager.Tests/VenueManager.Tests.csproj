@@ -20,5 +20,6 @@
     <Compile Include="..\VenueManager\XvmApiWriteModels.cs" Link="XvmApiWriteModels.cs" />
     <Compile Include="..\VenueManager\XvmApiErrors.cs" Link="XvmApiErrors.cs" />
     <Compile Include="..\VenueManager\XvmApiWrites.cs" Link="XvmApiWrites.cs" />
+    <Compile Include="..\VenueManager\VenueAddressMatcher.cs" Link="VenueAddressMatcher.cs" />
   </ItemGroup>
 </Project>

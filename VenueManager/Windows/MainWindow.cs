@@ -84,10 +84,6 @@ public class MainWindow : Window, IDisposable
     public void PrefillSale(int? amount, string? customer, bool tip = false)
         => salesTab.Prefill(amount, customer, tip);
 
-    public string GetRoomStatus(int roomNumber)
-        => roomsTab.GetRoomStatus(roomNumber);
-
-    public bool RoomsLoaded => roomsTab.HasLoaded;
 
     public override void Draw()
     {
