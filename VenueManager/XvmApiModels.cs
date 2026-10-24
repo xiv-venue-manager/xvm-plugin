@@ -6,8 +6,11 @@ namespace VenueManager
   internal sealed record XvmVenue(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("name")] string Name,
-    [property: JsonPropertyName("slug")] string Slug,
-    [property: JsonPropertyName("inventory_enabled")] bool InventoryEnabled);
+    [property: JsonPropertyName("slug")] string Slug);
+
+  internal sealed record XvmModule(
+    [property: JsonPropertyName("module")] string Module,
+    [property: JsonPropertyName("enabled")] bool Enabled);
 
   internal sealed record XvmMyVenue(
     [property: JsonPropertyName("venue")] XvmVenue Venue,

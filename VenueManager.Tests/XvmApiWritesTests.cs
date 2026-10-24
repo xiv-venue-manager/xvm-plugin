@@ -121,6 +121,25 @@ public class XvmApiWritesTests
     }
 
     [Fact]
+    public async Task A_sale_warns_when_the_event_lookup_fails_but_not_when_no_event_is_running()
+    {
+        var failed = new Handler()
+            .On("GET", "/venues/v1/events/active", "{}", HttpStatusCode.InternalServerError)
+            .On("POST", "/venues/v1/finance/transactions", "{\"id\":5,\"service_id\":null}", HttpStatusCode.Created);
+        var none = new Handler()
+            .On("GET", "/venues/v1/events/active", "null")
+            .On("POST", "/venues/v1/finance/transactions", "{\"id\":5,\"service_id\":null}", HttpStatusCode.Created);
+
+        var afterFailure = await Writes(failed).LogTransactionAsync("v1", null, 200, null, null, null);
+        var afterNone = await Writes(none).LogTransactionAsync("v1", null, 200, null, null, null);
+
+        Assert.True(afterFailure.Success);
+        Assert.NotNull(afterFailure.Warning);
+        Assert.True(afterNone.Success);
+        Assert.Null(afterNone.Warning);
+    }
+
+    [Fact]
     public async Task Out_of_stock_shows_the_servers_sentence()
     {
         var handler = new Handler()

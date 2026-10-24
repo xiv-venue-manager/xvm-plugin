@@ -127,6 +127,7 @@ namespace VenueManager
     public string? Error { get; set; }
     public string? ServiceId { get; set; }
     public int? ServiceStockCount { get; set; }
+    public string? Warning { get; set; }
   }
 
   public class ShiftDto

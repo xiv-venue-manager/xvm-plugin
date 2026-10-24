@@ -111,7 +111,12 @@ namespace VenueManager
       var reply = await SendAsync(HttpMethod.Post, $"{Venue(venueId)}/finance/transactions", body);
       if (!reply.Ok) return Result(reply);
 
-      var result = new LogTransactionResult { Success = true, ServiceId = serviceId };
+      var result = new LogTransactionResult
+      {
+        Success = true,
+        ServiceId = serviceId,
+        Warning = active.Ok ? null : "Logged without an event: could not check for a running event.",
+      };
       if (serviceKey is not null && kind == "sale")
       {
         var stock = await SendAsync(HttpMethod.Get, $"{Venue(venueId)}/services/{serviceKey}");

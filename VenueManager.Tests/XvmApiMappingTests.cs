@@ -22,8 +22,8 @@ public class XvmApiMappingTests
     {
         var venues = XvmApiMapping.MapVenues(new[]
         {
-            new XvmMyVenue(new XvmVenue("ven_1", "The Velvet Lotus", "velvet-lotus", true), "owner", 11, new List<int>()),
-            new XvmMyVenue(new XvmVenue("ven_2", "Moon Bar", "moon-bar", false), "staff", 12, null),
+            new XvmMyVenue(new XvmVenue("ven_1", "The Velvet Lotus", "velvet-lotus"), "owner", 11, new List<int>()),
+            new XvmMyVenue(new XvmVenue("ven_2", "Moon Bar", "moon-bar"), "staff", 12, null),
         });
 
         Assert.Equal(2, venues.Count);

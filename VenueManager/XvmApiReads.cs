@@ -85,7 +85,7 @@ namespace VenueManager
     }
 
     public async Task<bool> GetInventoryEnabledAsync(string venueId) =>
-      (await MyVenueAsync(venueId))?.Venue.InventoryEnabled ?? false;
+      (await GetAsync<List<XvmModule>>($"{Venue(venueId)}/modules"))?.Any(m => m.Module == "inventory" && m.Enabled) ?? false;
 
     public async Task<List<BannedPatron>> GetBannedPatronsAsync(string venueId) =>
       XvmApiMapping.MapBanned(await GetAsync<List<XvmBanned>>($"{Venue(venueId)}/patrons/banned") ?? new List<XvmBanned>());

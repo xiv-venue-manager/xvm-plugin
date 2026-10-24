@@ -601,6 +601,12 @@ namespace VenueManager
       MainWindow.IsOpen = true;
     }
 
+    public void PrintSaleWarning(LogTransactionResult result)
+    {
+      if (result.Warning == null) return;
+      Chat.Print((this.Configuration.showPluginNameInChat ? $"[{Name}] " : "") + result.Warning);
+    }
+
     // Used by `/xvm sale!` — see ARCHITECTURE.md § Slash commands
     // Computes the chat prefix and checks XIV-App is configured with a venue selected,
     // printing the appropriate error and returning false if not ready.
@@ -649,6 +655,7 @@ namespace VenueManager
           Chat.Print(prefix + (trimmedName != null
             ? $"Logged {amount}g{suffix} from {trimmedName}"
             : $"Logged {amount}g{suffix}"));
+          PrintSaleWarning(result);
         }
         else
         {
@@ -851,6 +858,16 @@ namespace VenueManager
 
     private void leftHouse()
     {
+      if (CurrentCharacter() is { } me && pluginState.currentHouse.houseId != 0)
+      {
+        var list = getCurrentGuestList();
+        if (list.guests.TryGetValue(me.Name, out var own) && own.inHouse)
+        {
+          own.onLeaveVenue();
+          list.save();
+          TryLogPatronVisit(me.Name, me.World, "leave");
+        }
+      }
       pluginState.userInHouse = false;
       pluginState.currentHouse = new Venue();
       stopwatch.Stop();
@@ -1361,7 +1378,7 @@ namespace VenueManager
               getCurrentGuestList().guests.Add(player.Name, player);
               if (!isSelf) playerArrived = true;
               showGuestEnterChatAlert(getCurrentGuestList().guests[player.Name], isSelf);
-              TryLogPatronVisit(player.Name, player.WorldName, "enter");
+              TryLogPatronVisit(player.Name, player.WorldName, justEnteredHouse && !isSelf ? "present" : "enter");
             }
             else if (!getCurrentGuestList().guests[player.Name].inHouse)
             {
@@ -1371,7 +1388,7 @@ namespace VenueManager
               getCurrentGuestList().guests[player.Name].timeCursor = DateTime.Now;
               getCurrentGuestList().guests[player.Name].entryCount++;
               showGuestEnterChatAlert(getCurrentGuestList().guests[player.Name], isSelf);
-              TryLogPatronVisit(player.Name, player.WorldName, "enter");
+              TryLogPatronVisit(player.Name, player.WorldName, justEnteredHouse && !isSelf ? "present" : "enter");
             }
             else if (justEnteredHouse)
             {
