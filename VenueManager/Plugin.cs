@@ -1281,11 +1281,6 @@ namespace VenueManager
             }
           }
 
-          if (!Configuration.showGuestsTab) {
-            running = false;
-            return;
-          }
-
           bool guestListUpdated = false;
           bool playerArrived = false;
           int playerCount = 0;
@@ -1334,7 +1329,7 @@ namespace VenueManager
             else if (justEnteredHouse)
             {
               getCurrentGuestList().guests[player.Name].timeCursor = DateTime.Now;
-              if (this.Configuration.showChatAlertAlreadyHere)
+              if (this.Configuration.showChatAlertAlreadyHere || (Configuration.alertBannedPatrons && isBannedPatron(player)))
                 showGuestEnterChatAlert(getCurrentGuestList().guests[player.Name], isSelf);
             }
 
@@ -1373,7 +1368,7 @@ namespace VenueManager
           }
           getCurrentGuestList().justLoaded = false;
 
-          if (Configuration.soundAlerts && playerArrived && !pluginState.snoozed)
+          if (Configuration.showGuestsTab && Configuration.soundAlerts && playerArrived && !pluginState.snoozed)
           {
             doorbell.play();
           }
@@ -1427,7 +1422,7 @@ namespace VenueManager
       // Fires independently of chat alert settings and snooze; only while a shift is active at a saved venue, unless free-enabled
       var shift = activeShift;
       var onShiftHere = knownVenue && shift != null && shift.Status == "ACTIVE";
-      if (!isSelf && !justEnteredHouse && (Configuration.greeterFreeEnable || onShiftHere))
+      if (Configuration.showGuestsTab && !isSelf && !justEnteredHouse && (Configuration.greeterFreeEnable || onShiftHere))
       {
         if (player.entryCount == 1 && Configuration.enableGreeterMode && !string.IsNullOrWhiteSpace(Configuration.greeterMessage))
           SendGameChat($"/tell {player.Name}@{player.WorldName} {Configuration.greeterMessage}");
@@ -1440,6 +1435,7 @@ namespace VenueManager
 
       if (isSelf)
       {
+        if (!Configuration.showGuestsTab) return;
         var selfVenue = venueList.venues[pluginState.currentHouse.houseId];
         if (this.Configuration.showPluginNameInChat) messageBuilder.AddText($"[{Name}] ");
         messageBuilder.AddText("You have entered " + selfVenue.name);
@@ -1463,6 +1459,7 @@ namespace VenueManager
         return;
       }
 
+      if (!Configuration.showGuestsTab) return;
       if (pluginState.snoozed) return;
       if (!Configuration.showChatAlerts) return;
 
@@ -1475,11 +1472,6 @@ namespace VenueManager
       if (player.entryCount == 1 && !Configuration.showChatAlertEntry && !isAlreadyHere) return;
 
       if (this.Configuration.showPluginNameInChat) messageBuilder.AddText($"[{Name}] ");
-
-      if (isBannedPatron(player))
-      {
-        messageBuilder.AddText("⚠ BANNED ");
-      }
 
       messageBuilder.AddUiForeground(Colors.getChatColor(player, true));
 
@@ -1508,6 +1500,7 @@ namespace VenueManager
 
     private void showGuestLeaveChatAlert(Player player)
     {
+      if (!Configuration.showGuestsTab) return;
       if (!Configuration.showChatAlerts) return;
       if (!Configuration.showChatAlertLeave) return;
       if (pluginState.snoozed) return;
