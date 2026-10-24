@@ -71,7 +71,7 @@ namespace VenueManager
 
     public async Task<ClockResult> ClaimShiftAsync(string venueId, string shiftId)
     {
-      var reply = await SendAsync(HttpMethod.Post, $"{Venue(venueId)}/shifts/{shiftId}/claim");
+      var reply = await SendAsync(HttpMethod.Post, $"{Venue(venueId)}/event-shifts/{shiftId}/join");
       if (!reply.Ok) return new ClockResult { Success = false, Error = reply.Error };
       var status = Read<XvmShiftReply>(reply.Body)?.Status;
       return new ClockResult { Success = true, Status = status is null ? "PENDING" : XvmApiMapping.ShiftStatus(status) };
