@@ -253,14 +253,25 @@ public class XvmApiWritesTests
     }
 
     [Fact]
-    public async Task A_character_linked_to_another_account_shows_the_servers_sentence()
+    public async Task A_character_linked_to_another_account_says_trying_again_will_not_help()
     {
         var handler = new Handler().On("POST", "/me/characters", "{\"detail\":\"That character is linked to another account.\"}", HttpStatusCode.Conflict);
 
         var result = await Writes(handler).LinkCharacterAsync("Someone Else", "Raiden");
 
         Assert.False(result.Success);
-        Assert.Equal("That character is linked to another account.", result.Error);
+        Assert.Equal("That character is linked to another account. Trying again will not change that.", result.Error);
+    }
+
+    [Fact]
+    public async Task Any_other_refusal_to_link_a_character_keeps_the_servers_sentence()
+    {
+        var handler = new Handler().On("POST", "/me/characters", "{\"detail\":\"World is not a known world.\"}", HttpStatusCode.UnprocessableEntity);
+
+        var result = await Writes(handler).LinkCharacterAsync("Someone Else", "Nowhere");
+
+        Assert.False(result.Success);
+        Assert.DoesNotContain("Trying again", result.Error);
     }
 
     [Fact]
