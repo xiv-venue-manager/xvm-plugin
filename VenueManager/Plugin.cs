@@ -1051,23 +1051,27 @@ namespace VenueManager
       };
     }
 
-    private async Task ClockFromPromptAsync(ShiftPrompt prompt, bool clockIn)
+    private Task ClockFromPromptAsync(ShiftPrompt prompt, bool clockIn)
     {
-      if (xivAppClient == null) return;
-      var shiftId = prompt.ShiftId.ToString(CultureInfo.InvariantCulture);
-      var result = clockIn
-        ? await xivAppClient.Shift.ClockInAsync(prompt.VenueId, shiftId)
-        : await xivAppClient.Shift.ClockOutAsync(prompt.VenueId, shiftId);
+      if (xivAppClient == null) return Task.CompletedTask;
       var chatPrefix = Configuration.showPluginNameInChat ? $"[{Name}] " : "";
-      if (result.Success)
+
+      return WithClockLockAsync(chatPrefix, async () =>
       {
-        Chat.Print(chatPrefix + (clockIn ? "Clocked in." : "Clocked out."));
-        InvalidateShiftPollCache();
-      }
-      else
-      {
-        Chat.Print(chatPrefix + $"{(clockIn ? "Clock-in" : "Clock-out")} failed: {result.Error ?? "unknown error"}");
-      }
+        var shiftId = prompt.ShiftId.ToString(CultureInfo.InvariantCulture);
+        var result = clockIn
+          ? await xivAppClient.Shift.ClockInAsync(prompt.VenueId, shiftId)
+          : await xivAppClient.Shift.ClockOutAsync(prompt.VenueId, shiftId);
+        if (result.Success)
+        {
+          Chat.Print(chatPrefix + (clockIn ? "Clocked in." : "Clocked out."));
+          InvalidateShiftPollCache();
+        }
+        else
+        {
+          Chat.Print(chatPrefix + $"{(clockIn ? "Clock-in" : "Clock-out")} failed: {result.Error ?? "unknown error"}");
+        }
+      });
     }
 
     // Polls every 30s so VIP/banned status set on the dashboard reaches the plugin without a manual resync
@@ -1462,6 +1466,17 @@ namespace VenueManager
       var messageBuilder = new SeStringBuilder();
       var knownVenue = venueList.venues.ContainsKey(pluginState.currentHouse.houseId);
 
+      // Fires independently of chat alert settings and snooze; only while a shift is active at a saved venue, unless free-enabled
+      var shift = activeShift;
+      var onShiftHere = knownVenue && shift != null && shift.Status == "ACTIVE";
+      if (Configuration.showGuestsTab && !isSelf && !justEnteredHouse && (Configuration.greeterFreeEnable || onShiftHere))
+      {
+        if (player.entryCount == 1 && Configuration.enableGreeterMode && !string.IsNullOrWhiteSpace(Configuration.greeterMessage))
+          SendGameChat($"/tell {player.Name}@{player.WorldName} {Configuration.greeterMessage}");
+        else if (player.entryCount > 1 && Configuration.enableReentryGreeter && !string.IsNullOrWhiteSpace(Configuration.reentryGreeterMessage))
+          SendGameChat($"/tell {player.Name}@{player.WorldName} {Configuration.reentryGreeterMessage}");
+      }
+
       // Only meaningful at a registered venue — otherwise every house spams the same line with no venue name
       if (!knownVenue) return;
 
@@ -1473,16 +1488,6 @@ namespace VenueManager
         messageBuilder.AddText("You have entered " + selfVenue.name);
         Chat.Print(new XivChatEntry() { Message = messageBuilder.Build() });
         return;
-      }
-
-      // Fires independently of chat alert settings and snooze; only while a shift is active
-      var shift = activeShift;
-      if (Configuration.showGuestsTab && !justEnteredHouse && shift != null && shift.Status == "ACTIVE")
-      {
-        if (player.entryCount == 1 && Configuration.enableGreeterMode && !string.IsNullOrWhiteSpace(Configuration.greeterMessage))
-          SendGameChat($"/tell {player.Name}@{player.WorldName} {Configuration.greeterMessage}");
-        else if (player.entryCount > 1 && Configuration.enableReentryGreeter && !string.IsNullOrWhiteSpace(Configuration.reentryGreeterMessage))
-          SendGameChat($"/tell {player.Name}@{player.WorldName} {Configuration.reentryGreeterMessage}");
       }
 
       if (Configuration.alertBannedPatrons && isBannedPatron(player))
