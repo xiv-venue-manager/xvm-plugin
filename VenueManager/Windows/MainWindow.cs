@@ -114,9 +114,10 @@ public class MainWindow : Window, IDisposable
 
         // Sync dot
         bool rejected = plugin.xivAppClient?.LinkRejected == true;
-        ImGui.TextColored(rejected ? Colors.XivRed : syncOn ? Colors.XivGreen : Colors.XivOverlay0, syncOn || rejected ? "●" : "○");
+        bool needsCharacter = syncOn && plugin.CurrentCharacterNeedsLink;
+        ImGui.TextColored(rejected ? Colors.XivRed : needsCharacter ? Colors.XivYellow : syncOn ? Colors.XivGreen : Colors.XivOverlay0, syncOn || rejected ? "●" : "○");
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip(rejected ? "Account link rejected - link again in Settings" : syncOn ? "XIV-App sync active" : "XIV-App sync off or unconfigured");
+            ImGui.SetTooltip(rejected ? "Account link rejected - link again in Settings" : needsCharacter ? "Your current character is not linked - link it in Settings" : syncOn ? "XIV-App sync active" : "XIV-App sync off or unconfigured");
 
         // Venue name
         ImGui.SameLine();
