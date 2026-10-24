@@ -83,6 +83,9 @@ public class SettingsTab : ITab
     DrawBanAlerts();
 
     DrawSectionSeparator();
+    DrawShiftPrompts();
+
+    DrawSectionSeparator();
     DrawPatronChatAlerts();
 
     DrawSectionSeparator();
@@ -234,6 +237,21 @@ public class SettingsTab : ITab
   }
 
   // -- Chat Alerts ----------------------------------------------------------
+
+  private void DrawShiftPrompts()
+  {
+    DrawSectionHeader("Shift Prompts");
+    var prompts = this.configuration.shiftPrompts;
+    if (ImGui.Checkbox("Remind me to clock in and out", ref prompts))
+    {
+      this.configuration.shiftPrompts = prompts;
+      this.configuration.Save();
+    }
+    if (ImGui.IsItemHovered())
+    {
+      ImGui.SetTooltip("Shows a notification when a shift of yours starts or runs past its end, at any venue. It never clocks you in or out by itself.");
+    }
+  }
 
   private void DrawBanAlerts()
   {
@@ -528,6 +546,8 @@ public class SettingsTab : ITab
     {
       var who = string.IsNullOrEmpty(this.configuration.xvmApiPersonName) ? "your account" : this.configuration.xvmApiPersonName;
       ImGui.TextColored(StatusOk, $"Linked as {who}");
+      if (plugin.xivAppClient?.LinkRejected == true)
+        ImGui.TextColored(StatusErr, "Your link was rejected (revoked or expired). Unlink and link again.");
       if (ImGui.Button("Unlink"))
       {
         this.configuration.xvmApiSecret = "";
@@ -645,6 +665,7 @@ public class SettingsTab : ITab
           this.configuration.Save();
           // Separate from Configuration so other code paths get a single source of truth that updates instantly
           plugin.currentXivAppVenueId = venue.Id;
+          plugin.ResetShiftForVenueChange();
           _ = LoadVenueDataWithFeedbackAsync(venue.Id, venue.Name);
         }
         if (isSelected)

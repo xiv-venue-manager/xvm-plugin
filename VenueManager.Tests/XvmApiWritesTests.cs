@@ -220,6 +220,21 @@ public class XvmApiWritesTests
     }
 
     [Fact]
+    public async Task A_401_on_a_write_reports_the_link_rejected_and_a_success_clears_it()
+    {
+        var states = new List<bool>();
+        var rejected = new Handler().On("POST", "/venues/v1/shifts/42/clock-in", "{\"detail\":\"Invalid credential\"}", HttpStatusCode.Unauthorized);
+        var first = await new XvmApiWrites(new HttpClient(rejected), "https://api.test/", "s3cret", TimeSpan.Zero, states.Add).ClockInAsync("v1", "42");
+
+        var ok = new Handler().On("POST", "/venues/v1/shifts/42/clock-in", "{\"status\":\"active\"}");
+        var second = await new XvmApiWrites(new HttpClient(ok), "https://api.test/", "s3cret", TimeSpan.Zero, states.Add).ClockInAsync("v1", "42");
+
+        Assert.False(first.Success);
+        Assert.True(second.Success);
+        Assert.Equal(new[] { true, false }, states);
+    }
+
+    [Fact]
     public async Task A_dropped_connection_becomes_a_failed_result_not_an_exception()
     {
         var handler = new ThrowingHandler();

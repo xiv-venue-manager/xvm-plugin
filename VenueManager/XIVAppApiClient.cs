@@ -30,16 +30,26 @@ namespace VenueManager
       Shift  = new XIVAppShiftApi(this);
     }
 
+    public volatile bool LinkRejected;
+
     public bool IsConfigured => Xvm is not null;
 
     public void ConfigureXvm(string url, string secret)
     {
       var linked = !string.IsNullOrWhiteSpace(secret);
-      Xvm = linked ? new XvmApiReads(XvmHttp, url, secret) : null;
-      XvmWrites = linked ? new XvmApiWrites(XvmHttp, url, secret) : null;
+      LinkRejected = false;
+      Xvm = linked ? new XvmApiReads(XvmHttp, url, secret, ReportLinkState) : null;
+      XvmWrites = linked ? new XvmApiWrites(XvmHttp, url, secret, null, ReportLinkState) : null;
     }
 
     public void ClearXvm() => ConfigureXvm("", "");
+
+    private void ReportLinkState(bool rejected)
+    {
+      if (rejected && !LinkRejected)
+        Plugin.Chat.Print("[XIV Venue Manager] Your account link was rejected. Open Settings to link again.");
+      LinkRejected = rejected;
+    }
 
     internal async Task<T> SafelyAsync<T>(Func<Task<T>> call, T fallback, string errorContext)
     {

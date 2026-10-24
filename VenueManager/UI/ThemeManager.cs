@@ -149,6 +149,11 @@ public static class ThemeManager
     // ready; callers still own EndChild()/return at the call site.
     public static bool RequireXivAppReady(Plugin plugin, string? notConfiguredMessage = null, string? noVenueMessage = null)
     {
+        if (plugin.xivAppClient?.LinkRejected == true)
+        {
+            ConfigBanner("Your account link was rejected (revoked or expired). Unlink and link again under Account link in Settings.");
+            return false;
+        }
         if (plugin.xivAppClient == null || !plugin.xivAppClient.IsConfigured)
         {
             ConfigBanner(notConfiguredMessage ?? "Your account is not linked. Link it under Account link in Settings.");

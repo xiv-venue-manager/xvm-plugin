@@ -3,6 +3,7 @@ using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
+using Dalamud.Interface.ImGuiNotification;
 using Dalamud.Game.Gui.Dtr;
 using VenueManager.Windows;
 using Dalamud.Game.ClientState.Objects.SubKinds;
@@ -42,6 +43,7 @@ namespace VenueManager
     [PluginService] public static ITargetManager TargetManager { get; private set; } = null!;
     [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
     [PluginService] public static IDtrBar DtrBar { get; private set; } = null!;
+    [PluginService] public static INotificationManager Notifications { get; private set; } = null!;
 
     public Configuration Configuration { get; init; }
     public PluginState pluginState { get; init; }
@@ -66,12 +68,14 @@ namespace VenueManager
 
     // Active shift cache, populated by background poll — see ARCHITECTURE.md § Shift tracking
     public volatile ShiftDto? activeShift = null;
+    private volatile ShiftDto? labelShift = null;
+    private volatile string? labelShiftVenueId = null;
     private long lastShiftPollMs = 0;
     private volatile bool shiftPollInFlight = false;
     private long lastBannedPollMs = 0;
     private volatile bool bannedPollInFlight = false;
-    private volatile string? _shiftReminderShiftId = null;
-    private long _shiftReminderLastMs = 0;
+    private readonly Dictionary<int, PromptMemory> shiftPromptMemory = new();
+    private readonly HashSet<int> mutedShifts = new();
     // Non-blocking try-acquire mutex shared by chat-command and UI clock actions
     public readonly SemaphoreSlim clockSem = new SemaphoreSlim(1, 1);
 
@@ -237,6 +241,7 @@ namespace VenueManager
 
         if (venueId == currentXivAppVenueId) return;
         currentXivAppVenueId = venueId;
+        ResetShiftForVenueChange();
         Configuration.selectedVenueId = venueId;
         Configuration.Save();
         await LoadVenueDataAsync(venueId);
@@ -732,6 +737,12 @@ namespace VenueManager
     // Forces a fresh shift poll next tick so the DTR label updates within one frame of a clock action
     public void InvalidateShiftPollCache() => lastShiftPollMs = 0;
 
+    public void ResetShiftForVenueChange()
+    {
+      activeShift = null;
+      InvalidateShiftPollCache();
+    }
+
     private void DrawUI()
     {
       this.WindowSystem.Draw();
@@ -859,9 +870,6 @@ namespace VenueManager
       if (!dtrEntry.Shown) return;
 
       var nowMs = Environment.TickCount64;
-      if (mode == DtrDisplayMode.ShiftStatus || mode == DtrDisplayMode.Combined)
-        PollActiveShiftAsync();
-
       if (!force && nowMs - dtrLastUpdateMs < 2000) return;
       dtrLastUpdateMs = nowMs;
 
@@ -900,6 +908,10 @@ namespace VenueManager
           break;
       }
       dtrEntry.Text = text;
+      var shiftVenue = labelShiftVenueId is null ? null : xivAppVenues.Find(v => v.Id == labelShiftVenueId)?.Name;
+      dtrEntry.Tooltip = shiftVenue is null || (mode != DtrDisplayMode.ShiftStatus && mode != DtrDisplayMode.Combined)
+        ? "XIV Venue Manager — click to open"
+        : $"XIV Venue Manager — click to open\nShift at {shiftVenue}";
     }
 
     // xiv-app linked name first, falls back to raw ward/plot tag; "Outside" when not in a house
@@ -925,7 +937,7 @@ namespace VenueManager
     private string BuildShiftLabel(bool prefix = true, bool compact = false)
     {
       var p = prefix ? "VM: " : "";
-      var s = activeShift;
+      var s = labelShift;
 
       if (s != null && s.Status == "ACTIVE" && !string.IsNullOrEmpty(s.ActualStart))
       {
@@ -958,38 +970,61 @@ namespace VenueManager
       return $"{(int)t.TotalSeconds}s";
     }
 
-    // Reminds when an ACTIVE shift runs past scheduled end; repeats every 15 min — see ARCHITECTURE.md § Shift tracking
-    private void CheckShiftEndReminder(ShiftDto? pick)
+    private void ShowShiftPrompt(ShiftPrompt prompt)
     {
-      if (pick == null || pick.Status != "ACTIVE" || string.IsNullOrEmpty(pick.ScheduledEnd))
+      var venueName = xivAppVenues.FirstOrDefault(v => v.Id == prompt.VenueId)?.Name ?? "a venue";
+      var starting = prompt.Kind == PromptKind.Start;
+      var verb = starting ? "Clock in" : "Clock out";
+      var text = starting ? $"Your shift at {venueName} has started." : $"Your shift at {venueName} has ended.";
+
+      var prefix = Configuration.showPluginNameInChat ? $"[{Name}] " : "";
+      Chat.Print(prefix + text + $" Use the notification or /xvm {(starting ? "start" : "end")}.");
+
+      var notification = Notifications.AddNotification(new Notification
       {
-        _shiftReminderShiftId = null;
-        _shiftReminderLastMs = 0;
-        return;
-      }
-
-      if (!DateTime.TryParse(pick.ScheduledEnd, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var endDt))
-        return;
-
-      var overBy = DateTime.UtcNow - endDt.ToUniversalTime();
-      if (overBy.TotalSeconds <= 0)
+        Title = starting ? "Shift started" : "Shift ended",
+        Content = text,
+        Type = NotificationType.Info,
+        InitialDuration = TimeSpan.FromMinutes(2),
+        UserDismissable = true,
+      });
+      notification.DrawActions += args =>
       {
-        if (_shiftReminderShiftId == pick.Id) { _shiftReminderShiftId = null; _shiftReminderLastMs = 0; }
-        return;
-      }
+        if (ImGui.Button(verb))
+        {
+          _ = ClockFromPromptAsync(prompt, starting);
+          notification.DismissNow();
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Not now"))
+        {
+          lock (mutedShifts) mutedShifts.Add(prompt.ShiftId);
+          notification.DismissNow();
+        }
+      };
+    }
 
-      var nowMs = Environment.TickCount64;
-      bool firstReminder = _shiftReminderShiftId != pick.Id;
-      bool intervalElapsed = nowMs - _shiftReminderLastMs >= 15 * 60 * 1000;
+    private Task ClockFromPromptAsync(ShiftPrompt prompt, bool clockIn)
+    {
+      if (xivAppClient == null) return Task.CompletedTask;
+      var chatPrefix = Configuration.showPluginNameInChat ? $"[{Name}] " : "";
 
-      if (!firstReminder && !intervalElapsed) return;
-
-      string prefix = Configuration.showPluginNameInChat ? $"[{Name}] " : "";
-      string overMsg = overBy.TotalMinutes < 2 ? "just ended" : $"ended {FormatDuration(overBy)} ago";
-      Chat.Print(prefix + $"Your shift {overMsg} — type /xvm end when you're done.");
-
-      _shiftReminderShiftId = pick.Id;
-      _shiftReminderLastMs = nowMs;
+      return WithClockLockAsync(chatPrefix, async () =>
+      {
+        var shiftId = prompt.ShiftId.ToString(CultureInfo.InvariantCulture);
+        var result = clockIn
+          ? await xivAppClient.Shift.ClockInAsync(prompt.VenueId, shiftId)
+          : await xivAppClient.Shift.ClockOutAsync(prompt.VenueId, shiftId);
+        if (result.Success)
+        {
+          Chat.Print(chatPrefix + (clockIn ? "Clocked in." : "Clocked out."));
+          InvalidateShiftPollCache();
+        }
+        else
+        {
+          Chat.Print(chatPrefix + $"{(clockIn ? "Clock-in" : "Clock-out")} failed: {result.Error ?? "unknown error"}");
+        }
+      });
     }
 
     // Polls every 30s so VIP/banned status set on the dashboard reaches the plugin without a manual resync
@@ -1024,14 +1059,15 @@ namespace VenueManager
       });
     }
 
-    // Picks ACTIVE shift, else earliest future SCHEDULED, else null; errors swallowed ("Off shift" is a truthful fallback)
-    private void PollActiveShiftAsync()
+    private void PollMyShiftsAsync()
     {
-      if (shiftPollInFlight) return;
+      var wantsLabel = Configuration.dtrDisplayMode is DtrDisplayMode.ShiftStatus or DtrDisplayMode.Combined
+        || Configuration.enableGreeterMode || Configuration.enableReentryGreeter;
+      var wantsPrompts = Configuration.shiftPrompts;
+      if (shiftPollInFlight || (!wantsLabel && !wantsPrompts)) return;
       var nowMs = Environment.TickCount64;
       if (nowMs - lastShiftPollMs < 30_000) return;
-      if (xivAppClient == null || !xivAppClient.IsConfigured) return;
-      if (string.IsNullOrEmpty(currentXivAppVenueId)) return;
+      if (xivAppClient?.Xvm is not { } xvm) return;
 
       lastShiftPollMs = nowMs;
       shiftPollInFlight = true;
@@ -1039,36 +1075,56 @@ namespace VenueManager
       {
         try
         {
-          var list = (await xivAppClient.Shift.GetShiftsResponseAsync(currentXivAppVenueId)).Shifts;
-          ShiftDto? pick = null;
-          foreach (var s in list)
-          {
-            if (s.Status == "ACTIVE") { pick = s; break; }
-          }
-          if (pick == null)
-          {
-            DateTime? bestStart = null;
-            foreach (var s in list)
-            {
-              if (s.Status != "SCHEDULED" || string.IsNullOrEmpty(s.ScheduledStart)) continue;
-              if (!DateTime.TryParse(s.ScheduledStart, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dt)) continue;
-              var utc = dt.ToUniversalTime();
-              if (utc < DateTime.UtcNow) continue;
-              if (bestStart == null || utc < bestStart.Value) { bestStart = utc; pick = s; }
-            }
-          }
-          activeShift = pick;
-          CheckShiftEndReminder(pick);
+          var now = DateTime.UtcNow;
+          var all = await xvm.GetMyShiftsAsync(now);
+          if (wantsLabel) UpdateShiftLabel(now, all);
+          if (wantsPrompts) ShowDuePrompts(now, all);
         }
         catch (Exception ex)
         {
-          Log.Warning($"DTR shift poll failed: {ex.Message}");
+          Log.Warning("Shift poll failed: {0}", ex.Message);
         }
         finally
         {
           shiftPollInFlight = false;
         }
       });
+    }
+
+    // Label shows the clocked-in shift at any venue, else the soonest upcoming one; activeShift stays the current venue's for the greeter
+    private void UpdateShiftLabel(DateTime now, List<MyShift> all)
+    {
+      var venueId = currentXivAppVenueId;
+      var anywhere = ShiftLabelPicker.Pick(now, all, venueId);
+      var here = string.IsNullOrEmpty(venueId) ? null : ShiftLabelPicker.Pick(now, all.Where(s => s.VenueId == venueId), venueId);
+      activeShift = here is null ? null : ToShiftDto(here);
+      labelShift = anywhere is null ? null : ToShiftDto(anywhere);
+      labelShiftVenueId = anywhere?.VenueId;
+    }
+
+    private void ShowDuePrompts(DateTime now, List<MyShift> all)
+    {
+      List<ShiftPrompt> due;
+      lock (mutedShifts) due = ShiftPromptPlanner.Due(now, all, shiftPromptMemory, mutedShifts);
+      foreach (var prompt in due)
+      {
+        shiftPromptMemory[prompt.ShiftId] = new PromptMemory(prompt.Kind, now);
+        ShowShiftPrompt(prompt);
+      }
+    }
+
+    private static ShiftDto ToShiftDto(MyShift s)
+    {
+      static string? Iso(DateTime? t) => t?.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
+      return new ShiftDto
+      {
+        Id = s.Id.ToString(CultureInfo.InvariantCulture),
+        ScheduledStart = Iso(s.ScheduledStart) ?? "",
+        ScheduledEnd = Iso(s.ScheduledEnd) ?? "",
+        ActualStart = Iso(s.ActualStart),
+        ActualEnd = Iso(s.ActualEnd),
+        Status = XvmApiMapping.ShiftStatus(s.Status),
+      };
     }
 
     private unsafe void OnFrameworkUpdate(IFramework framework)
@@ -1082,6 +1138,7 @@ namespace VenueManager
       {
         UpdateDtrBar();
         PollBannedPatronsAsync();
+        PollMyShiftsAsync();
 
         // Exterior-entry poll — see ARCHITECTURE.md § Housing/location detection
         if (!pluginState.userInHouse && entryPollStopwatch.ElapsedMilliseconds > 1000)
