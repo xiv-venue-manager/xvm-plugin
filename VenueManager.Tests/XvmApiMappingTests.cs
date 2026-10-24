@@ -44,7 +44,7 @@ public class XvmApiMappingTests
             new XvmShift(8, null, "2026-10-09T19:00:00Z", "2026-10-09T23:00:00Z", "2026-10-09T19:02:00Z", "2026-10-09T23:10:00Z", null, "completed"),
         };
 
-        var result = XvmApiMapping.MapShifts(mine, new XvmShift[0], new Dictionary<int, string>());
+        var result = XvmApiMapping.MapShifts(mine, new XvmBoardShift[0]);
 
         Assert.Equal(2, result.Shifts.Count);
         Assert.Equal("7", result.Shifts[0].Id);
@@ -60,7 +60,7 @@ public class XvmApiMappingTests
     public void A_shift_with_no_scheduled_times_gets_empty_strings_not_nulls()
     {
         var walkIn = new XvmShift(9, null, null, null, "2026-10-10T20:00:00Z", null, null, "active");
-        var result = XvmApiMapping.MapShifts(new[] { walkIn }, new XvmShift[0], new Dictionary<int, string>());
+        var result = XvmApiMapping.MapShifts(new[] { walkIn }, new XvmBoardShift[0]);
         Assert.Equal("", result.Shifts[0].ScheduledStart);
         Assert.Equal("", result.Shifts[0].ScheduledEnd);
         Assert.Equal("ACTIVE", result.Shifts[0].Status);
@@ -71,15 +71,30 @@ public class XvmApiMappingTests
     {
         var open = new[]
         {
-            new XvmShift(20, 3, "2026-10-11T19:00:00Z", "2026-10-11T23:00:00Z", null, null, null, "open"),
-            new XvmShift(21, null, "2026-10-12T19:00:00Z", "2026-10-12T23:00:00Z", null, null, null, "open"),
+            new XvmBoardShift(20, "2026-10-11T19:00:00Z", "2026-10-11T23:00:00Z", "Shout runner"),
+            new XvmBoardShift(21, "2026-10-12T19:00:00Z", "2026-10-12T23:00:00Z", "Bartender"),
         };
 
-        var result = XvmApiMapping.MapShifts(new XvmShift[0], open, new Dictionary<int, string> { [3] = "Shout runner" });
+        var result = XvmApiMapping.MapShifts(new XvmShift[0], open);
 
         Assert.Equal("20", result.OpenShifts[0].Id);
         Assert.Equal("Shout runner", result.OpenShifts[0].RoleName);
-        Assert.Null(result.OpenShifts[1].RoleName);
+        Assert.Equal("2026-10-12T19:00:00Z", result.OpenShifts[1].ScheduledStart);
+    }
+
+    [Fact]
+    public void An_open_shift_the_caller_already_holds_a_seat_on_is_left_off_the_board()
+    {
+        var mine = new[] { new XvmShift(7, 3, "2026-10-11T19:00:00Z", "2026-10-11T23:00:00Z", null, null, null, "scheduled", 20) };
+        var open = new[]
+        {
+            new XvmBoardShift(20, "2026-10-11T19:00:00Z", "2026-10-11T23:00:00Z", "Shout runner"),
+            new XvmBoardShift(21, "2026-10-12T19:00:00Z", "2026-10-12T23:00:00Z", "Bartender"),
+        };
+
+        var result = XvmApiMapping.MapShifts(mine, open);
+
+        Assert.Equal(new[] { "21" }, result.OpenShifts.Select(s => s.Id));
     }
 
     [Fact]

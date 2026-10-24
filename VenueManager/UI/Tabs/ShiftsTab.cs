@@ -301,9 +301,9 @@ public class ShiftsTab : ITab
       var result = await plugin.xivAppClient.Shift.ClaimShiftAsync(plugin.currentXivAppVenueId ?? "", shiftId);
       if (result.Success)
       {
-        statusMessage = result.Merged
-          ? "Shift claimed and merged with your existing shift!"
-          : "Shift claimed! Waiting for manager approval.";
+        statusMessage = result.Status == "PENDING"
+          ? "Shift claimed! Waiting for manager approval."
+          : "Shift claimed!";
         statusIsError = false;
         _ = FetchShiftsAsync();
       }

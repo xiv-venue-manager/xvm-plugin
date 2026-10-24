@@ -184,7 +184,6 @@ namespace VenueManager
     public string? Error { get; set; }
     public string? Status { get; set; }
     public double? HoursWorked { get; set; }
-    public bool Merged { get; set; }
   }
 
   public class XIVAppApiException : Exception

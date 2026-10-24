@@ -413,6 +413,19 @@ public class SettingsTab : ITab
       ImGui.Unindent(20);
     }
 
+    if (enableGreeterMode || enableReentryGreeter)
+    {
+      ImGui.Spacing();
+      var greeterFreeEnable = this.configuration.greeterFreeEnable;
+      if (ImGui.Checkbox("⚠ Free Enable##greeterFree", ref greeterFreeEnable))
+      {
+        this.configuration.greeterFreeEnable = greeterFreeEnable;
+        this.configuration.Save();
+      }
+      if (ImGui.IsItemHovered())
+        ImGui.SetTooltip("Greets in any house you're in, on shift or not, including houses that aren't your venue.\nStill skips players already inside when you arrive.");
+    }
+
     if (!this.configuration.showGuestsTab) ImGui.EndDisabled();
   }
 

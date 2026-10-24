@@ -26,7 +26,14 @@ namespace VenueManager
     [property: JsonPropertyName("actual_start")] string? ActualStart,
     [property: JsonPropertyName("actual_end")] string? ActualEnd,
     [property: JsonPropertyName("notes")] string? Notes,
-    [property: JsonPropertyName("status")] string Status);
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("event_shift_id")] int? EventShiftId = null);
+
+  internal sealed record XvmBoardShift(
+    [property: JsonPropertyName("id")] int Id,
+    [property: JsonPropertyName("starts_at")] string StartsAt,
+    [property: JsonPropertyName("ends_at")] string EndsAt,
+    [property: JsonPropertyName("position_name")] string PositionName);
 
   internal sealed record XvmPosition(
     [property: JsonPropertyName("id")] int Id,

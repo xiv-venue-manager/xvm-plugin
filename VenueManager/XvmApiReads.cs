@@ -50,11 +50,8 @@ namespace VenueManager
     {
       var window = $"from={Uri.EscapeDataString((now - LookBack).ToString("yyyy-MM-ddTHH:mm:ssZ"))}&to={Uri.EscapeDataString((now + LookAhead).ToString("yyyy-MM-ddTHH:mm:ssZ"))}";
       var mine = await GetAsync<List<XvmShift>>($"{Venue(venueId)}/shifts?{window}&mine=true") ?? new List<XvmShift>();
-      var open = await GetAsync<List<XvmShift>>($"{Venue(venueId)}/shifts?{window}&open_only=true") ?? new List<XvmShift>();
-      var names = new Dictionary<int, string>();
-      if (open.Count > 0)
-        names = (await GetAsync<List<XvmPosition>>($"{Venue(venueId)}/positions") ?? new List<XvmPosition>()).ToDictionary(p => p.Id, p => p.Name);
-      return XvmApiMapping.MapShifts(mine, open, names);
+      var open = await GetAsync<List<XvmBoardShift>>($"{Venue(venueId)}/event-shifts?{window}&open_only=true") ?? new List<XvmBoardShift>();
+      return XvmApiMapping.MapShifts(mine, open);
     }
 
     internal async Task<List<MyShift>> GetMyShiftsAsync(DateTime now)

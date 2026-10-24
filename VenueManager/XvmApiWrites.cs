@@ -75,7 +75,7 @@ namespace VenueManager
 
     public async Task<ClockResult> ClaimShiftAsync(string venueId, string shiftId)
     {
-      var reply = await SendAsync(HttpMethod.Post, $"{Venue(venueId)}/shifts/{shiftId}/claim");
+      var reply = await SendAsync(HttpMethod.Post, $"{Venue(venueId)}/event-shifts/{shiftId}/join");
       if (!reply.Ok) return new ClockResult { Success = false, Error = reply.Error };
       var status = Read<XvmShiftReply>(reply.Body)?.Status;
       return new ClockResult { Success = true, Status = status is null ? "PENDING" : XvmApiMapping.ShiftStatus(status) };
@@ -148,7 +148,8 @@ namespace VenueManager
     public async Task<CharacterLinkResult> LinkCharacterAsync(string characterName, string world)
     {
       var reply = await SendAsync(HttpMethod.Post, "/me/characters", new XvmCharacterBody(characterName, world));
-      return reply.Ok ? new CharacterLinkResult(true, reply.Status == 201, null) : new CharacterLinkResult(false, false, reply.Error);
+      if (reply.Ok) return new CharacterLinkResult(true, reply.Status == 201, null);
+      return new CharacterLinkResult(false, false, reply.Status == 409 ? $"{reply.Error} Trying again will not change that." : reply.Error);
     }
 
     public async Task<LogTransactionResult> UnlinkCharacterAsync(int characterId) =>
