@@ -184,6 +184,7 @@ namespace VenueManager
     public string? Error { get; set; }
     public string? Status { get; set; }
     public double? HoursWorked { get; set; }
+    public bool Retryable { get; set; }
   }
 
   public class XIVAppApiException : Exception

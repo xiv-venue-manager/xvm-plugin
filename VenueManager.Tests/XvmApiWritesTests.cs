@@ -28,6 +28,12 @@ public class XvmApiWritesTests
         }
     }
 
+    private sealed class Unreachable : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            throw new HttpRequestException("The server cannot be reached.");
+    }
+
     private static XvmApiWrites Writes(Handler handler) => new(new HttpClient(handler), "https://api.test/", "s3cret", TimeSpan.Zero);
 
     private static JsonElement Json(string body) => JsonDocument.Parse(body).RootElement;
@@ -53,6 +59,43 @@ public class XvmApiWritesTests
 
         Assert.False(result.Success);
         Assert.Equal("Pending approval.", result.Error);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.ServiceUnavailable, true)]
+    [InlineData(HttpStatusCode.InternalServerError, true)]
+    [InlineData(HttpStatusCode.Conflict, false)]
+    [InlineData(HttpStatusCode.Forbidden, false)]
+    public async Task A_failed_clock_in_is_retryable_only_when_the_server_could_not_answer(HttpStatusCode status, bool retryable)
+    {
+        var handler = new Handler().On("POST", "/venues/v1/shifts/42/clock-in", "{\"detail\":\"No.\"}", status);
+
+        var result = await Writes(handler).ClockInAsync("v1", "42");
+
+        Assert.False(result.Success);
+        Assert.Equal(retryable, result.Retryable);
+    }
+
+    [Fact]
+    public async Task A_clock_in_that_cannot_reach_the_server_is_retryable()
+    {
+        var writes = new XvmApiWrites(new HttpClient(new Unreachable()), "https://api.test/", "s3cret", TimeSpan.Zero);
+
+        var result = await writes.ClockInAsync("v1", "42");
+
+        Assert.False(result.Success);
+        Assert.True(result.Retryable);
+    }
+
+    [Fact]
+    public async Task A_clock_in_that_succeeds_is_not_marked_retryable()
+    {
+        var handler = new Handler().On("POST", "/venues/v1/shifts/42/clock-in", "{\"status\":\"active\"}");
+
+        var result = await Writes(handler).ClockInAsync("v1", "42");
+
+        Assert.True(result.Success);
+        Assert.False(result.Retryable);
     }
 
     [Fact]
