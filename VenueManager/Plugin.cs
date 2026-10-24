@@ -1004,23 +1004,27 @@ namespace VenueManager
       };
     }
 
-    private async Task ClockFromPromptAsync(ShiftPrompt prompt, bool clockIn)
+    private Task ClockFromPromptAsync(ShiftPrompt prompt, bool clockIn)
     {
-      if (xivAppClient == null) return;
-      var shiftId = prompt.ShiftId.ToString(CultureInfo.InvariantCulture);
-      var result = clockIn
-        ? await xivAppClient.Shift.ClockInAsync(prompt.VenueId, shiftId)
-        : await xivAppClient.Shift.ClockOutAsync(prompt.VenueId, shiftId);
+      if (xivAppClient == null) return Task.CompletedTask;
       var chatPrefix = Configuration.showPluginNameInChat ? $"[{Name}] " : "";
-      if (result.Success)
+
+      return WithClockLockAsync(chatPrefix, async () =>
       {
-        Chat.Print(chatPrefix + (clockIn ? "Clocked in." : "Clocked out."));
-        InvalidateShiftPollCache();
-      }
-      else
-      {
-        Chat.Print(chatPrefix + $"{(clockIn ? "Clock-in" : "Clock-out")} failed: {result.Error ?? "unknown error"}");
-      }
+        var shiftId = prompt.ShiftId.ToString(CultureInfo.InvariantCulture);
+        var result = clockIn
+          ? await xivAppClient.Shift.ClockInAsync(prompt.VenueId, shiftId)
+          : await xivAppClient.Shift.ClockOutAsync(prompt.VenueId, shiftId);
+        if (result.Success)
+        {
+          Chat.Print(chatPrefix + (clockIn ? "Clocked in." : "Clocked out."));
+          InvalidateShiftPollCache();
+        }
+        else
+        {
+          Chat.Print(chatPrefix + $"{(clockIn ? "Clock-in" : "Clock-out")} failed: {result.Error ?? "unknown error"}");
+        }
+      });
     }
 
     // Polls every 30s so VIP/banned status set on the dashboard reaches the plugin without a manual resync
