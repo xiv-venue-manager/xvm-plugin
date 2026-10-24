@@ -9,10 +9,16 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    # CI_RUNS_ON picks the runner, e.g. ["self-hosted","ci"]; unset, it runs on GitHub's own.
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["ubuntu-latest"]') }}
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
