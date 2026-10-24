@@ -41,6 +41,9 @@ namespace VenueManager
     public bool enableReentryGreeter { get; set; } = false;
     public string reentryGreeterMessage { get; set; } = "Welcome back!";
 
+    // Greets in any house, on shift or not.
+    public bool greeterFreeEnable { get; set; } = false;
+
     // Should sound alerts be played when new players join the house
     public bool soundAlerts { get; set; } = false;
     public float soundVolume { get; set; } = 1;

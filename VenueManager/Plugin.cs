@@ -1367,6 +1367,17 @@ namespace VenueManager
       var messageBuilder = new SeStringBuilder();
       var knownVenue = venueList.venues.ContainsKey(pluginState.currentHouse.houseId);
 
+      // Fires independently of chat alert settings and snooze; only while a shift is active at a saved venue, unless free-enabled
+      var shift = activeShift;
+      var onShiftHere = knownVenue && shift != null && shift.Status == "ACTIVE";
+      if (!isSelf && !justEnteredHouse && (Configuration.greeterFreeEnable || onShiftHere))
+      {
+        if (player.entryCount == 1 && Configuration.enableGreeterMode && !string.IsNullOrWhiteSpace(Configuration.greeterMessage))
+          SendGameChat($"/tell {player.Name}@{player.WorldName} {Configuration.greeterMessage}");
+        else if (player.entryCount > 1 && Configuration.enableReentryGreeter && !string.IsNullOrWhiteSpace(Configuration.reentryGreeterMessage))
+          SendGameChat($"/tell {player.Name}@{player.WorldName} {Configuration.reentryGreeterMessage}");
+      }
+
       // Only meaningful at a registered venue — otherwise every house spams the same line with no venue name
       if (!knownVenue) return;
 
@@ -1377,16 +1388,6 @@ namespace VenueManager
         messageBuilder.AddText("You have entered " + selfVenue.name);
         Chat.Print(new XivChatEntry() { Message = messageBuilder.Build() });
         return;
-      }
-
-      // Fires independently of chat alert settings and snooze; only while a shift is active
-      var shift = activeShift;
-      if (!justEnteredHouse && shift != null && shift.Status == "ACTIVE")
-      {
-        if (player.entryCount == 1 && Configuration.enableGreeterMode && !string.IsNullOrWhiteSpace(Configuration.greeterMessage))
-          SendGameChat($"/tell {player.Name}@{player.WorldName} {Configuration.greeterMessage}");
-        else if (player.entryCount > 1 && Configuration.enableReentryGreeter && !string.IsNullOrWhiteSpace(Configuration.reentryGreeterMessage))
-          SendGameChat($"/tell {player.Name}@{player.WorldName} {Configuration.reentryGreeterMessage}");
       }
 
       if (Configuration.alertBannedPatrons && isBannedPatron(player))
