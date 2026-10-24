@@ -47,22 +47,19 @@ The migration check is deliberately **not** nested inside the "houseId just chan
 
 **`InvalidateShiftPollCache()` exists to make clock actions feel instant.** Called after any successful clock-in/out so the DTR label reflects the new state within one frame, rather than waiting up to 30s for the normal poll interval to naturally expire.
 
+**The label can show a shift at another venue, and the tooltip says which.** It reads the cross-venue shift list, so a shift you are clocked into elsewhere shows instead of "Off shift"; hovering the bar adds "Shift at <venue>". Venue names stay out of the label text because the strip is short. `activeShift` (the current venue's shift, used by the greeter) is kept separately from the shift the label shows, so greeting patrons never fires at venue B because you are clocked in at venue A.
+
 ## Shift tracking
 
-**The active-shift cache and `ShiftsTab`'s own polling aren't coordinated.** `activeShift` is populated by a background poll every 30s so the DTR can surface clock-in status even when the user never opens the Shifts tab. `null` means either "no active shift" or "haven't polled yet / the API call failed" — those two states aren't distinguished. `ShiftsTab` polls independently for its own UI; the two polls run on separate schedules, but 30s is cheap enough that the caches converge within a tick of each other in practice.
+**One poll of `GET /me/shifts` feeds the status bar label, the greeter's current-venue shift, and the clock prompts.** It runs every 30 seconds when the status bar shows shifts, shift prompts are on, or a greeter is on, and not otherwise. The greeter is in that list because its "a shift is active" check reads `activeShift`, which used to be refreshed only when the status bar was in a shift mode. `null` means either no shift or "not polled yet / the call failed", and those two are not distinguished. `ShiftsTab` polls the current venue on its own schedule for its own list.
 
-**`clockSem` is a single mutex for all clock-in/clock-out operations**, regardless of which path triggers them (chat command vs. UI button). `WaitAsync(0)` is a non-blocking try-acquire — if the semaphore is already held, the caller gets told "a clock action is already in progress" immediately rather than blocking the calling thread waiting for the other operation to finish.
+**`clockSem` is a single mutex for all clock-in/clock-out operations**, regardless of which path triggers them (chat command, UI button, or a prompt). `WaitAsync(0)` is a non-blocking try-acquire: if the semaphore is already held, the caller is told "a clock action is already in progress" immediately rather than blocking the calling thread.
 
-**The lazy shift poller (`PollActiveShiftAsync`) picks "the most relevant" shift for DTR purposes**, in this priority order:
-1. Any `ACTIVE` shift wins (the user is clocked in right now).
-2. Otherwise, the earliest `SCHEDULED` shift starting in the future.
-3. Otherwise, `null` (clears the cache).
+**`ShiftLabelPicker` chooses the label's shift.** A clocked-in shift at any venue wins, and if there are several the current venue's wins. Otherwise the soonest approved shift that has not started yet, anywhere. A shift that has started but is not clocked in is not shown, and neither is one waiting for approval. Overlapping clocks at two venues are allowed: the server's one-active-clock rule is per membership (venue), not per person.
 
-It runs at most once per 30s, skips itself if a previous call is still in flight, and swallows errors silently — the DTR fallback of "Off shift" is a truthful display when the server can't be reached, so there's no need to surface the failure.
+**Clock prompts are prompts, never automation.** `ShiftPromptPlanner` decides, from the same list, which shifts are due: an approved shift that has started and is not clocked in gets one start prompt (including on login mid-shift), and a clocked-in shift past its scheduled end gets an end prompt, repeated every 15 minutes and given up 12 hours after the end because the server sweeps forgotten shifts. Each prompt is a Dalamud notification with Clock in or Clock out and Not now buttons plus one chat line. Not now mutes that shift until the plugin restarts; closing the notification does not. The buttons use the prompting shift's own venue id. The muted set is touched from the notification's UI thread and the poll's background thread, so both take the same lock. This replaced a chat reminder that only knew the current venue.
 
-**The shift-end chat reminder fires once, then repeats every 15 minutes.** When an `ACTIVE` shift runs past its scheduled end, `CheckShiftEndReminder` prints once immediately, then again every 15 min in case the first message was missed. State is tracked per shift ID and clears automatically once the shift is no longer `ACTIVE` (clocked out, or the poll returns `null`).
-
-**VIP/banned patron lists poll on the same 30s cadence as the shift poller.** These lists were previously only loaded on plugin startup and via the manual "Fetch Venues" button, so marking someone VIP or banned on the dashboard never reached the plugin without a manual resync. `PollVipBannedPatronsAsync` closes that gap by polling every 30s, matching `PollActiveShiftAsync`'s existing pattern (in-flight guard, cooldown, silent-swallow errors).
+**The banned list polls every 30 seconds.** It used to load only at startup and from Fetch Venues, so a ban set on the dashboard never reached the plugin without a manual resync. `PollBannedPatronsAsync` closes that with an in-flight guard, a cooldown, and silent error swallowing. The Bans tab reads the same list and is always visible; a banned patron arriving prints a warning with the reason whatever the chat alert, snooze and Patrons tab settings are (Settings, Ban Alerts).
 
 ## Patron sync & chat alerts
 
@@ -73,8 +70,8 @@ It runs at most once per 30s, skips itself if a previous call is still in flight
 **`TryLogPatronVisit` deliberately does NOT filter out the plugin user's own character.** Staff who are off-duty (no active shift) count as patrons visiting their own venue, and the server classifies attribution via `wasWorking` at insert time — the plugin doesn't need to make that call client-side.
 
 Gating order (cheapest checks first, to avoid unnecessary async work):
-1. Sync enabled + API key present + client configured.
-2. Current house → xiv-app venue ID mapping exists (if not, silent skip — the VenuesTab linking UI is the user-facing remedy for this).
+1. Sync enabled + account linked.
+2. Current house → venue ID mapping exists. It is normally filled in by address (see Account link and venue matching); if it is not, the visit is skipped silently and the VenuesTab dropdown is the manual remedy.
 3. If `syncOnlyDuringEvents`, the cached event-presence flag must be true — on a cache miss, fetch async and bail for *this* arrival; the next arrival within the TTL will go through once the cache is warm.
 4. Post.
 
@@ -109,29 +106,35 @@ For `/xvm target` (not `target!`), the "customer" override is the game target, n
 - `BanPatronSilentAsync` — works even for a character with no prior visit history; the server finds-or-creates the `Patron` row.
 - The shift clock silent commands share `clockSem` with the UI buttons (see Shift Tracking above) and reset the shift-poll cache on success so the DTR updates within one frame.
 
+## Account link and venue matching
+
+**The plugin talks to xvm-api directly with its own account-wide credential.** A person generates a one-time code on the dashboard (API Keys, Generate link code), types it into Settings, Account link, and the plugin exchanges it for a secret that is stored in the config. Reads are in `XvmApiReads`, writes in `XvmApiWrites`, and the `XIVApp*Api` classes keep their method signatures and delegate to them. There is no fallback to the old `/api/plugin/*` routes. The credential has to be account-wide because `/me/shifts` and `/me/venues` refuse a credential narrowed to one venue.
+
+**A 401 marks the link as rejected, and any later success clears it.** One stray 401 therefore cannot leave the plugin stuck. While it is set the plugin prints one chat line, the header dot goes red, Settings shows red text under Account link, and the tabs show a banner. The polls keep running, so a restored link recovers by itself.
+
+**`XvmApiWrites` still waits 300 ms after a successful write, a leftover from when xvm-api committed after it had sent its response.** That cause is gone: xvm-api #164 ("Commit before responding") merged on 2026-10-12, so a read right after a write no longer sees the old state. The wait does nothing useful now, and #12 removes it.
+
+**A house is matched to a venue by address.** `VenueAddressMatcher` compares world, district, ward and then either the plot or the apartment room plus main or subdivision. House size is never compared. A link is only filled in when exactly one venue matches, an existing link is never replaced, and a clash links nothing. The game values were checked in game: a main-division apartment reads plot -127, a subdivision apartment -126, and a chamber keeps the plot with a room number.
+
+**Each FC chamber has its own house id, so chambers are never linked or saved as venues.** Entering one only switches the current venue to the FC house's venue (matched by address) and prints the room's status, built from a fresh fetch of the venue's rooms. Apartments have no rooms to show, so the Rooms tab auto-open and the room message only run for plot houses.
+
+**Venue addresses are loaded with the venue list, and refetched when an entered house matches nothing**, at most once a minute, so an address edited on the website while the plugin runs links without a restart.
+
+**The Lifestream teleport is disabled for apartment venues.** Lifestream cannot be handed an apartment address, and the plugin used to send the plot value -127, which Lifestream read as plot 12.
+
 ## Startup / configuration
 
-**The XIV-App API client is always instantiated, even with no key set**, so the Settings tab can lazy-configure it the moment the user pastes a key. This used to be gated on the key already being present at construction time, which made first-time setup require a full game restart before "Fetch Venues" would work.
+**The XIV-App API client is always instantiated, even when the account is not linked**, so the Settings tab can configure it the moment a code is accepted, with no restart. `IsConfigured` means "an account is linked".
 
-**Startup auto-load (`AutoLoadXivAppDataAsync`) is fire-and-forget from the constructor**, so a server outage at launch can't block plugin init. The Settings tab still renders cleanly with empty lists in the worst case, and the manual "Fetch Venues" button remains as a retry path. It picks the previously-selected venue if it still exists, otherwise the first one — mirroring the manual button's own selection logic so startup state matches "user just clicked Fetch" state.
+**Startup auto-load (`AutoLoadXivAppDataAsync`) is fire-and-forget from the constructor**, so a server outage at launch can't block plugin init. It loads the venue list and their addresses, picks the previously-selected venue if it still exists (otherwise the first), and loads that venue's roles, services, bans and inventory flag through `LoadVenueDataAsync`, which "follow the house" also uses. The manual Fetch Venues button remains as a retry path.
 
 **The cached `PluginVersion` string is read from the loaded assembly**, not hardcoded — `Plugin.cs`, `XIVVenueManagerSync.json`, and `repo.json` are kept in lockstep by the build+ship ritual, so reading from the running assembly means the dashboard strip and the changelog-on-update check auto-follow whatever version the user actually has installed.
 
 ## Settings UI (`SettingsTab.cs`)
 
-**XIV-App Sync is drawn first** because it's the plugin's primary workflow — a fresh install should land on the setup the user actually needs to do, not scroll past unrelated toggles first.
+**Account link is drawn first**, with Fetch Venues, the venue picker and the roles and services lists directly under it once linked, because linking is the one thing a fresh install has to do. XIV-App Sync below it is only the Enable checkbox.
 
 **The status line under "Fetch Venues"** (`xivAppStatus`/`xivAppStatusColor`) exists so users see success/failure of button-press actions instead of a silent no-op. Default color is the muted overlay so a fresh "Fetching…" line reads as in-progress rather than success or failure. The row is reserved (via a `Dummy` placeholder) whether or not a status is active, so appearing/disappearing text doesn't shove the rest of the section up and down.
-
-**The API key field is masked by default** — keys are sensitive, and a default-hidden field means screenshots/shares don't leak them. The eye icon flips visibility; the toggle itself is UI-only state, not persisted. The key is also trimmed on every keystroke, to strip the whitespace/newlines that regularly sneak in from Discord copy-paste — an untrimmed key made `HttpClient.DefaultRequestHeaders.Add` throw a `FormatException`, and the key was silently never applied.
-
-**Auto-fetch fires on blur** (`IsItemDeactivatedAfterEdit`), not on every keystroke — a paste + click-elsewhere is enough to trigger a venue fetch, no separate "Fetch Venues" click required.
-
-**Inline key-format validation is a warning, not an error color.** If the entered key doesn't start with `vm_`, the message renders in yellow (warn), not red — the user is still mid-entry at that point, nothing has actually failed yet.
-
-**The server URL field falls back to the public host when blank.** Users who leave the placeholder hint in place (rather than typing anything) expect the plugin to "just work" against the default server — this is handled both in `ReconfigureXivAppClient()` and independently mirrored wherever the URL is read.
-
-**`FetchXivAppVenuesAsync` self-heals a stale client config.** If a key was just pasted and `ReconfigureXivAppClient` hasn't fired yet (or silently failed for some other reason), the fetch path reconfigures again before making the request, rather than surfacing a confusing "not configured" error for what the user just did.
 
 **Venue auto-select/re-hydrate on fetch** avoids a "(none fetched yet)" status sticking around: if no venue is selected yet, the first fetched venue becomes selected; if one was already selected, its roles/services get re-fetched so an already-configured plugin's first load after an update doesn't show stale placeholder text.
 
