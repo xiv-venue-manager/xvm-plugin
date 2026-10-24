@@ -81,7 +81,7 @@ All failures log at Debug level and swallow — a sync hiccup should never surfa
 
 **Chat/sound alerts are only meaningful at a registered venue.** Without a known venue (i.e. `venueList.venues` doesn't contain the current house), every house the player walks into — theirs or not — would spam the same "has entered/left" line with no venue name to attach it to, so unregistered houses are silently skipped for both entry and leave alerts.
 
-**The auto-greeter fires independently of chat alert settings and snooze.** A venue owner may want automated `/tell` greetings without the visual chat noise of entry/leave alerts, so the greeter check happens before (and regardless of) the snooze/chat-alert-enabled checks further down. It skips already-here players when the greeter re-enters the venue (only fires on `entryCount == 1` for the first-visit message, `> 1` for the re-entry message) and only fires at registered venues while a shift is active.
+**The auto-greeter fires independently of chat alert settings and snooze.** A venue owner may want automated `/tell` greetings without the visual chat noise of entry/leave alerts, so the greeter check happens before (and regardless of) the snooze/chat-alert-enabled checks further down. It skips already-here players when the greeter re-enters the venue (only fires on `entryCount == 1` for the first-visit message, `> 1` for the re-entry message) and only fires at registered venues while a shift is active, unless **Free Enable** is on, in which case it fires in any house, on shift or not. It runs before the registered-venue check rather than after it, because that check also guards the self-entry line and the banned alert, which look the venue up by house id and would throw in an unregistered house.
 
 ## Slash commands
 
@@ -114,7 +114,7 @@ For `/xvm target` (not `target!`), the "customer" override is the game target, n
 
 **A 401 marks the link as rejected, and any later success clears it.** One stray 401 therefore cannot leave the plugin stuck. While it is set the plugin prints one chat line, the header dot goes red, Settings shows red text under Account link, and the tabs show a banner. The polls keep running, so a restored link recovers by itself.
 
-**xvm-api commits after it has sent a response, so a read right after a write can see the old state.** `XvmApiWrites` waits 300 ms after a successful write so the tab's refetch lands after the commit. It is a workaround; xvm-api issue #160 is the real fix.
+**`XvmApiWrites` still waits 300 ms after a successful write, a leftover from when xvm-api committed after it had sent its response.** That cause is gone: xvm-api #164 ("Commit before responding") merged on 2026-10-12, so a read right after a write no longer sees the old state. The wait does nothing useful now, and #12 removes it.
 
 **A house is matched to a venue by address.** `VenueAddressMatcher` compares world, district, ward and then either the plot or the apartment room plus main or subdivision. House size is never compared. A link is only filled in when exactly one venue matches, an existing link is never replaced, and a clash links nothing. The game values were checked in game: a main-division apartment reads plot -127, a subdivision apartment -126, and a chamber keeps the plot with a room number.
 

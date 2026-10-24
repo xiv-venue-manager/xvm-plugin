@@ -24,7 +24,7 @@ namespace VenueManager
         Role = v.EffectiveTier.ToUpperInvariant(),
       }).ToList();
 
-    public static ShiftsResponse MapShifts(IEnumerable<XvmShift> mine, IEnumerable<XvmShift> open, IReadOnlyDictionary<int, string> positionNames) =>
+    public static ShiftsResponse MapShifts(IEnumerable<XvmShift> mine, IEnumerable<XvmBoardShift> open) =>
       new()
       {
         Shifts = mine.Select(s => new ShiftDto
@@ -37,12 +37,12 @@ namespace VenueManager
           Status = ShiftStatus(s.Status),
           Notes = s.Notes,
         }).ToList(),
-        OpenShifts = open.Select(s => new OpenShiftDto
+        OpenShifts = open.Where(s => mine.All(m => m.EventShiftId != s.Id)).Select(s => new OpenShiftDto
         {
           Id = s.Id.ToString(CultureInfo.InvariantCulture),
-          ScheduledStart = s.ScheduledStart ?? "",
-          ScheduledEnd = s.ScheduledEnd ?? "",
-          RoleName = s.PositionId is { } id && positionNames.TryGetValue(id, out var name) ? name : null,
+          ScheduledStart = s.StartsAt,
+          ScheduledEnd = s.EndsAt,
+          RoleName = s.PositionName,
         }).ToList(),
       };
 
