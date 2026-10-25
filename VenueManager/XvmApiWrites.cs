@@ -84,7 +84,9 @@ namespace VenueManager
     public async Task<ClockResult> ClockInAsync(string venueId, string shiftId)
     {
       var reply = await SendAsync(HttpMethod.Post, $"{Venue(venueId)}/shifts/{shiftId}/clock-in");
-      return reply.Ok ? new ClockResult { Success = true, Status = "ACTIVE" } : new ClockResult { Success = false, Error = reply.Error };
+      return reply.Ok
+        ? new ClockResult { Success = true, Status = "ACTIVE" }
+        : new ClockResult { Success = false, Error = reply.Error, Retryable = reply.Status == 0 || reply.Status >= 500 };
     }
 
     public async Task<ClockResult> ClockOutAsync(string venueId, string shiftId)

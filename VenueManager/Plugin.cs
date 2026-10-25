@@ -1087,6 +1087,7 @@ namespace VenueManager
         else
         {
           Chat.Print(chatPrefix + $"{(clockIn ? "Clock-in" : "Clock-out")} failed: {result.Error ?? "unknown error"}");
+          if (clockIn && result.Retryable) lock (mutedShifts) shiftPromptMemory.Remove(prompt.ShiftId);
         }
       });
     }
@@ -1172,7 +1173,7 @@ namespace VenueManager
       lock (mutedShifts) due = ShiftPromptPlanner.Due(now, all, shiftPromptMemory, mutedShifts);
       foreach (var prompt in due)
       {
-        shiftPromptMemory[prompt.ShiftId] = new PromptMemory(prompt.Kind, now);
+        lock (mutedShifts) shiftPromptMemory[prompt.ShiftId] = new PromptMemory(prompt.Kind, now);
         ShowShiftPrompt(prompt);
       }
     }
