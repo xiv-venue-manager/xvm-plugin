@@ -15,7 +15,12 @@ public class ChangelogWindow : Window, IDisposable
 
     private static readonly ChangelogEntry[] Entries =
     [
-        new("v3.11.0", "August 2026", "Exterior Plot Tracking", IsCurrent: true,
+        new("v3.11.1", "October 2026", "Auto-Greeter Fix", IsCurrent: true,
+        [
+            "Fixed the auto-greeter never sending welcome messages when the Status Bar (DTR) display was set to Disabled",
+        ]),
+
+        new("v3.11.0", "August 2026", "Exterior Plot Tracking", IsCurrent: false,
         [
             "Patron tracking now works from the plot exterior, not just the house interior",
             "New Rooms tab for room status, new Inventory tab linking drinks to real FFXIV items",
