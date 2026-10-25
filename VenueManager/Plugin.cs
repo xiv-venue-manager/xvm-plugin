@@ -978,6 +978,7 @@ namespace VenueManager
       try
       {
         UpdateDtrBar();
+        if (Configuration.enableGreeterMode || Configuration.enableReentryGreeter) PollActiveShiftAsync();
         PollBannedPatronsAsync();
 
         // Exterior-entry poll — see ARCHITECTURE.md § Housing/location detection
