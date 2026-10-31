@@ -1,0 +1,47 @@
+name: Publish Dev plugin
+
+on:
+  push:
+    branches: [master, feat/dev-flavour]
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+
+concurrency:
+  group: publish-dev
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Run tests
+        run: dotnet test VenueManager.Tests
+
+      - name: Fetch Dalamud
+        run: |
+          url=$(curl -sSf "https://kamori.goats.dev/Dalamud/Release/VersionInfo?track=stg" | jq -r .downloadUrl)
+          mkdir -p "$HOME/.xlcore/dalamud/Hooks/dev"
+          curl -sSfL "$url" -o "$RUNNER_TEMP/dalamud.zip"
+          unzip -q "$RUNNER_TEMP/dalamud.zip" -d "$HOME/.xlcore/dalamud/Hooks/dev"
+
+      - name: Build Dev package
+        run: scripts/build-dev-package.sh "$RUNNER_TEMP/stage"
+
+      - name: Upload to MinIO
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.MINIO_PLUGIN_DEV_USER }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.MINIO_PLUGIN_DEV_SECRET }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          stage="$RUNNER_TEMP/stage"
+          for f in "$stage"/XIVVenueManagerSyncDev-*.zip "$stage/icon.png"; do
+            aws s3 cp "$f" s3://plugin-dev/ --endpoint-url https://media.xivvenuemanager.com
+          done
+          aws s3 cp "$stage/repo.json" s3://plugin-dev/ --endpoint-url https://media.xivvenuemanager.com --content-type application/json

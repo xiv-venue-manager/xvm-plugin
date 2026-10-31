@@ -35,7 +35,11 @@ public class MainWindow : Window, IDisposable
     public static MainWindow? Instance { get; private set; }
 
     public MainWindow(Plugin plugin) : base(
+#if DEV_FLAVOUR
+        "XIV Venue Manager (Dev)###XIVVMMain",
+#else
         "XIV Venue Manager###XIVVMMain",
+#endif
         ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
     {
         Instance = this;

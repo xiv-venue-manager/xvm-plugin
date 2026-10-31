@@ -528,12 +528,12 @@ public class SettingsTab : ITab
     ImGui.TextColored(Colors.XivGreen, "Welcome to XIV Venue Manager Sync!");
     ImGui.TextWrapped("To get started, link the plugin to your xivvenuemanager.com account.");
     ImGui.Spacing();
-    ImGui.TextWrapped("1. Log in with Discord at xivvenuemanager.com");
+    ImGui.TextWrapped($"1. Log in with Discord at {XvmApiPairing.WebUrl.Replace("https://", "")}");
     ImGui.TextWrapped("2. Open the Dashboard, go to API Keys and press Generate link code");
     ImGui.TextWrapped("3. Type the code into Link code below and press Link");
     ImGui.Spacing();
-    if (ImGui.Button("Open xivvenuemanager.com"))
-      Util.OpenLink("https://xivvenuemanager.com");
+    if (ImGui.Button(XvmApiPairing.IsDevFlavour ? "Open dev.xivvenuemanager.com" : "Open xivvenuemanager.com"))
+      Util.OpenLink(XvmApiPairing.WebUrl);
     ImGui.Spacing();
     ImGui.Separator();
     ImGui.Spacing();
@@ -579,7 +579,7 @@ public class SettingsTab : ITab
     if (linking) ImGui.BeginDisabled();
     if (ImGui.Button("Link") && !linking) _ = LinkAccountAsync();
     if (linking) ImGui.EndDisabled();
-    ImGui.TextDisabled("Get a code at xivvenuemanager.com/dashboard/api-keys.");
+    ImGui.TextDisabled($"Get a code at {XvmApiPairing.WebUrl.Replace("https://", "")}/dashboard/api-keys.");
     if (!string.IsNullOrEmpty(linkStatus)) ImGui.TextColored(linkStatusColor, linkStatus);
     ImGui.Spacing();
   }
@@ -689,7 +689,7 @@ public class SettingsTab : ITab
     linkStatusColor = StatusWarn;
     try
     {
-      var url = string.IsNullOrWhiteSpace(this.configuration.xvmApiUrl) ? XvmApiPairing.DefaultUrl : this.configuration.xvmApiUrl;
+      var url = XvmApiPairing.ResolveUrl(this.configuration.xvmApiUrl);
       var result = await XvmApiPairing.LinkAsync(XvmHttp, url, pairingCode);
       if (result.Success)
       {

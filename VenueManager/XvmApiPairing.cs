@@ -36,7 +36,33 @@ namespace VenueManager
 
   public static class XvmApiPairing
   {
-    public const string DefaultUrl = "https://api.xivvenuemanager.com";
+    public const string ProdUrl = "https://api.xivvenuemanager.com";
+    public const string DevUrl = "https://dev-api.xivvenuemanager.com";
+
+#if DEV_FLAVOUR
+    public const string DefaultUrl = DevUrl;
+    public const bool IsDevFlavour = true;
+    public const string WebUrl = "https://dev.xivvenuemanager.com";
+#else
+    public const string DefaultUrl = ProdUrl;
+    public const bool IsDevFlavour = false;
+    public const string WebUrl = "https://xivvenuemanager.com";
+#endif
+
+    private static readonly string[] DevAllowedHosts = { "dev-api.xivvenuemanager.com", "localhost", "127.0.0.1", "100.80.129.7" };
+
+    public static string ResolveUrl(string? configured, bool dev)
+    {
+      var fallback = dev ? DevUrl : ProdUrl;
+      if (string.IsNullOrWhiteSpace(configured)) return fallback;
+      var trimmed = configured.Trim().TrimEnd('/');
+      if (!dev) return trimmed;
+      return Uri.TryCreate(trimmed, UriKind.Absolute, out var uri) && Array.IndexOf(DevAllowedHosts, uri.Host.ToLowerInvariant()) >= 0
+        ? trimmed
+        : fallback;
+    }
+
+    public static string ResolveUrl(string? configured) => ResolveUrl(configured, IsDevFlavour);
 
     private const int MeAttempts = 6;
     private static readonly TimeSpan DefaultRetryDelay = TimeSpan.FromMilliseconds(250);
