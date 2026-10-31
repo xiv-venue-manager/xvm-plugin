@@ -86,6 +86,40 @@ public class ShiftVenuePickerTests
         Assert.Equal(ShiftVenueChoiceKind.Conflict, Pick(ClockedIn(1, "a"), ClockedIn(2, "b")).Kind);
     }
 
+    private static readonly ShiftVenueChoice None = new(ShiftVenueChoiceKind.None);
+    private static readonly ShiftVenueChoice OneVenue = new(ShiftVenueChoiceKind.Venue, "a");
+    private static readonly ShiftVenueChoice Conflict = new(ShiftVenueChoiceKind.Conflict);
+
+    [Fact]
+    public void A_conflict_is_announced_when_it_starts()
+    {
+        Assert.True(ShiftVenuePicker.EnteredConflict(null, Conflict));
+        Assert.True(ShiftVenuePicker.EnteredConflict(None, Conflict));
+        Assert.True(ShiftVenuePicker.EnteredConflict(OneVenue, Conflict));
+    }
+
+    [Fact]
+    public void A_conflict_that_carries_on_is_not_announced_again()
+    {
+        Assert.False(ShiftVenuePicker.EnteredConflict(Conflict, Conflict));
+    }
+
+    [Fact]
+    public void Leaving_a_conflict_or_never_having_one_announces_nothing()
+    {
+        Assert.False(ShiftVenuePicker.EnteredConflict(Conflict, OneVenue));
+        Assert.False(ShiftVenuePicker.EnteredConflict(Conflict, None));
+        Assert.False(ShiftVenuePicker.EnteredConflict(null, OneVenue));
+        Assert.False(ShiftVenuePicker.EnteredConflict(None, None));
+    }
+
+    [Fact]
+    public void A_conflict_that_clears_and_comes_back_is_announced_again()
+    {
+        Assert.False(ShiftVenuePicker.EnteredConflict(Conflict, OneVenue));
+        Assert.True(ShiftVenuePicker.EnteredConflict(OneVenue, Conflict));
+    }
+
     [Fact]
     public void A_later_shift_at_another_venue_does_not_make_a_conflict_yet()
     {

@@ -1210,7 +1210,9 @@ namespace VenueManager
     private async Task FollowShiftVenueAsync(DateTime now, List<MyShift> all)
     {
       var choice = ShiftVenuePicker.Pick(now, all);
+      var before = shiftVenueChoice;
       shiftVenueChoice = choice;
+      if (ShiftVenuePicker.EnteredConflict(before, choice)) AnnounceShiftVenueConflict();
       if (choice is not { Kind: ShiftVenueChoiceKind.Venue, VenueId: { } venueId } || venueId == currentXivAppVenueId) return;
       var venue = xivAppVenues.Find(v => v.Id == venueId);
       if (venue is null) return;
@@ -1229,6 +1231,21 @@ namespace VenueManager
       {
         Log.Warning("Loading {0} after switching to it for a shift failed: {1}", venueId, ex.Message);
       }
+    }
+
+    private void AnnounceShiftVenueConflict()
+    {
+      const string text = "Your running shifts are at more than one venue, so the plugin is not choosing a venue for you.";
+      var prefix = Configuration.showPluginNameInChat ? $"[{Name}] " : "";
+      Chat.Print(prefix + text);
+      Notifications.AddNotification(new Notification
+      {
+        Title = "Shifts at more than one venue",
+        Content = text,
+        Type = NotificationType.Warning,
+        InitialDuration = TimeSpan.FromMinutes(2),
+        UserDismissable = true,
+      });
     }
 
     private void ShowDuePrompts(DateTime now, List<MyShift> all)

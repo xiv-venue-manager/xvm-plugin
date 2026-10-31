@@ -22,6 +22,9 @@ namespace VenueManager
       return running.Count > 0 ? Decide(running) : new ShiftVenueChoice(ShiftVenueChoiceKind.None);
     }
 
+    public static bool EnteredConflict(ShiftVenueChoice? before, ShiftVenueChoice now) =>
+      now.Kind == ShiftVenueChoiceKind.Conflict && before?.Kind != ShiftVenueChoiceKind.Conflict;
+
     private static List<string> VenuesOf(IEnumerable<MyShift> shifts) => shifts.Select(s => s.VenueId).Distinct().ToList();
 
     private static ShiftVenueChoice Decide(List<string> venues) =>
