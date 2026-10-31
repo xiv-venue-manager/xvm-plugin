@@ -13,14 +13,12 @@ namespace VenueManager
     private readonly HttpClient _http;
     private readonly string _root;
     private readonly string _secret;
-    private readonly TimeSpan _settle;
     private readonly Action<bool>? _linkState;
     private int? _personId;
 
-    public XvmApiWrites(HttpClient http, string baseUrl, string secret, TimeSpan? settle = null, Action<bool>? linkState = null)
+    public XvmApiWrites(HttpClient http, string baseUrl, string secret, Action<bool>? linkState = null)
     {
       _linkState = linkState;
-      _settle = settle ?? TimeSpan.FromMilliseconds(300);
       _http = http;
       _root = baseUrl.Trim().TrimEnd('/');
       _secret = secret;
@@ -41,7 +39,6 @@ namespace VenueManager
         using var response = await _http.SendAsync(request);
         if ((int)response.StatusCode == 401) _linkState?.Invoke(true);
         else if (response.IsSuccessStatusCode) _linkState?.Invoke(false);
-        if (response.IsSuccessStatusCode && method != HttpMethod.Get) await Task.Delay(_settle);
         return new Reply(response.IsSuccessStatusCode, (int)response.StatusCode, await response.Content.ReadAsStringAsync());
       }
       catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)

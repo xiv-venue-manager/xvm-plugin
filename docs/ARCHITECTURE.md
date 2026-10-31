@@ -116,7 +116,7 @@ For `/xvm target` (not `target!`), the "customer" override is the game target, n
 
 **A 401 marks the link as rejected, and any later success clears it.** One stray 401 therefore cannot leave the plugin stuck. While it is set the plugin prints one chat line, the header dot goes red, Settings shows red text under Account link, and the tabs show a banner. The polls keep running, so a restored link recovers by itself.
 
-**`XvmApiWrites` still waits 300 ms after a successful write, a leftover from when xvm-api committed after it had sent its response.** That cause is gone: xvm-api #164 ("Commit before responding") merged on 2026-10-12, so a read right after a write no longer sees the old state. The wait does nothing useful now, and #12 removes it.
+**`XvmApiWrites` does not wait after a write.** xvm-api commits before it responds (xvm-api #164, "Commit before responding", merged 2026-10-12), so a read straight after a write sees it. Until #12 the plugin waited 300 ms after every successful write because the commit used to happen after the response; 100 write-then-read cycles against the dev API showed no stale read once that was fixed.
 
 **A house is matched to a venue by address.** `VenueAddressMatcher` compares world, district, ward and then either the plot or the apartment room plus main or subdivision. House size is never compared. A link is only filled in when exactly one venue matches, an existing link is never replaced, and a clash links nothing. The game values were checked in game: a main-division apartment reads plot -127, a subdivision apartment -126, and a chamber keeps the plot with a room number.
 
