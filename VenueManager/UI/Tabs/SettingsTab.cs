@@ -256,6 +256,18 @@ public class SettingsTab : ITab
     {
       ImGui.SetTooltip("Shows a notification when a shift of yours starts or runs past its end, at any venue. It never clocks you in or out by itself.");
     }
+
+    var follow = this.configuration.followShiftVenue;
+    if (ImGui.Checkbox("Switch venue to match my shift", ref follow))
+    {
+      this.configuration.followShiftVenue = follow;
+      if (!follow) plugin.shiftVenueChoice = null;
+      this.configuration.Save();
+    }
+    if (ImGui.IsItemHovered())
+    {
+      ImGui.SetTooltip("While a shift of yours is running at one venue, the plugin works at that venue, even if you are standing in another one. With no shift running, your own choice stays. Turn this off to choose the venue by hand.");
+    }
   }
 
   private void DrawBanAlerts()
@@ -762,6 +774,8 @@ public class SettingsTab : ITab
     var selectedVenue = plugin.xivAppVenues.FirstOrDefault(v => v.Id == selectedVenueId);
     var displayName = selectedVenue?.Name ?? "Select Venue";
 
+    var followingShift = plugin.ShiftDecidesVenue;
+    if (followingShift) ImGui.BeginDisabled();
     if (ImGui.BeginCombo("Venue", displayName))
     {
       foreach (var venue in plugin.xivAppVenues)
@@ -781,6 +795,12 @@ public class SettingsTab : ITab
       }
       ImGui.EndCombo();
     }
+    if (followingShift) ImGui.EndDisabled();
+
+    if (followingShift)
+      ImGui.TextDisabled($"Following your shift at {selectedVenue?.Name ?? "this venue"}. Turn off \"Switch venue to match my shift\" to choose by hand.");
+    else if (plugin.ShiftVenueConflict)
+      ImGui.TextColored(StatusWarn, "Your running shifts are at more than one venue, so the plugin is not choosing for you.");
 
     // Truncated with hover-to-reveal — a venue with many roles/services wraps ugly otherwise
     DrawTruncatedNameList("Roles", plugin.xivAppRoles.ConvertAll(r => r.Name));
