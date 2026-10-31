@@ -34,7 +34,7 @@ public class XvmApiWritesTests
             throw new HttpRequestException("The server cannot be reached.");
     }
 
-    private static XvmApiWrites Writes(Handler handler) => new(new HttpClient(handler), "https://api.test/", "s3cret", TimeSpan.Zero);
+    private static XvmApiWrites Writes(Handler handler) => new(new HttpClient(handler), "https://api.test/", "s3cret");
 
     private static JsonElement Json(string body) => JsonDocument.Parse(body).RootElement;
 
@@ -79,7 +79,7 @@ public class XvmApiWritesTests
     [Fact]
     public async Task A_clock_in_that_cannot_reach_the_server_is_retryable()
     {
-        var writes = new XvmApiWrites(new HttpClient(new Unreachable()), "https://api.test/", "s3cret", TimeSpan.Zero);
+        var writes = new XvmApiWrites(new HttpClient(new Unreachable()), "https://api.test/", "s3cret");
 
         var result = await writes.ClockInAsync("v1", "42");
 
@@ -286,10 +286,10 @@ public class XvmApiWritesTests
     {
         var states = new List<bool>();
         var rejected = new Handler().On("POST", "/venues/v1/shifts/42/clock-in", "{\"detail\":\"Invalid credential\"}", HttpStatusCode.Unauthorized);
-        var first = await new XvmApiWrites(new HttpClient(rejected), "https://api.test/", "s3cret", TimeSpan.Zero, states.Add).ClockInAsync("v1", "42");
+        var first = await new XvmApiWrites(new HttpClient(rejected), "https://api.test/", "s3cret", states.Add).ClockInAsync("v1", "42");
 
         var ok = new Handler().On("POST", "/venues/v1/shifts/42/clock-in", "{\"status\":\"active\"}");
-        var second = await new XvmApiWrites(new HttpClient(ok), "https://api.test/", "s3cret", TimeSpan.Zero, states.Add).ClockInAsync("v1", "42");
+        var second = await new XvmApiWrites(new HttpClient(ok), "https://api.test/", "s3cret", states.Add).ClockInAsync("v1", "42");
 
         Assert.False(first.Success);
         Assert.True(second.Success);

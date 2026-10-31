@@ -39,7 +39,7 @@ namespace VenueManager
       var linked = !string.IsNullOrWhiteSpace(secret);
       LinkRejected = false;
       Xvm = linked ? new XvmApiReads(XvmHttp, url, secret, ReportLinkState) : null;
-      XvmWrites = linked ? new XvmApiWrites(XvmHttp, url, secret, null, ReportLinkState) : null;
+      XvmWrites = linked ? new XvmApiWrites(XvmHttp, url, secret, ReportLinkState) : null;
     }
 
     public void ClearXvm() => ConfigureXvm("", "");
