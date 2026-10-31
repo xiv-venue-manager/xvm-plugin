@@ -1037,6 +1037,12 @@ namespace VenueManager
     private void ShowShiftPrompt(ShiftPrompt prompt)
     {
       var venueName = xivAppVenues.FirstOrDefault(v => v.Id == prompt.VenueId)?.Name ?? "a venue";
+      if (prompt.Kind == PromptKind.Soon)
+      {
+        ShowShiftSoonNotice(prompt, venueName);
+        return;
+      }
+
       var starting = prompt.Kind == PromptKind.Start;
       var verb = starting ? "Clock in" : "Clock out";
       var text = starting ? $"Your shift at {venueName} has started." : $"Your shift at {venueName} has ended.";
@@ -1066,6 +1072,24 @@ namespace VenueManager
           notification.DismissNow();
         }
       };
+    }
+
+    private void ShowShiftSoonNotice(ShiftPrompt prompt, string venueName)
+    {
+      var remaining = (prompt.StartsAt ?? DateTime.UtcNow) - DateTime.UtcNow;
+      var text = $"Your shift at {venueName} starts in {FormatDuration(remaining)}.";
+
+      var prefix = Configuration.showPluginNameInChat ? $"[{Name}] " : "";
+      Chat.Print(prefix + text);
+
+      Notifications.AddNotification(new Notification
+      {
+        Title = "Shift starting soon",
+        Content = text,
+        Type = NotificationType.Info,
+        InitialDuration = TimeSpan.FromMinutes(2),
+        UserDismissable = true,
+      });
     }
 
     private Task ClockFromPromptAsync(ShiftPrompt prompt, bool clockIn)
