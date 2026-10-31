@@ -161,7 +161,8 @@ public class RoomsTab : ITab
     loading = true;
     try
     {
-      rooms = await plugin.xivAppClient.Venue.GetRoomsAsync(plugin.currentXivAppVenueId);
+      var fetched = await plugin.xivAppClient.Venue.GetRoomsAsync(plugin.currentXivAppVenueId);
+      if (fetched is not null) rooms = fetched;
       lastFetch = DateTime.Now;
     }
     catch (Exception ex)
