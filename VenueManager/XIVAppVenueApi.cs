@@ -51,13 +51,13 @@ namespace VenueManager
 
     public Task<ActiveEventResponse?> GetActiveEventAsync(string venueId) =>
       _client.Xvm is { } xvm
-        ? _client.SafelyAsync<ActiveEventResponse?>(async () => await xvm.GetActiveEventAsync(venueId), new ActiveEventResponse { Active = false }, "fetch active event")
+        ? _client.SafelyAsync<ActiveEventResponse?>(async () => await xvm.GetActiveEventAsync(venueId), null, "fetch active event")
         : Task.FromResult<ActiveEventResponse?>(new ActiveEventResponse { Active = false });
 
-    public Task<List<Room>> GetRoomsAsync(string venueId) =>
+    public Task<List<Room>?> GetRoomsAsync(string venueId) =>
       _client.Xvm is { } xvm
-        ? _client.SafelyAsync(() => xvm.GetRoomsAsync(venueId), new List<Room>(), "get rooms")
-        : Task.FromResult(new List<Room>());
+        ? _client.SafelyAsync<List<Room>?>(async () => await xvm.GetRoomsAsync(venueId), null, "get rooms")
+        : Task.FromResult<List<Room>?>(null);
 
     public Task<bool> GetInventoryEnabledAsync(string venueId) =>
       _client.Xvm is { } xvm

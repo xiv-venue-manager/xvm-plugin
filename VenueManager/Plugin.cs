@@ -248,7 +248,9 @@ namespace VenueManager
         await follow;
         var venueId = currentXivAppVenueId;
         if (xivAppClient == null || string.IsNullOrEmpty(venueId)) return;
-        var room = (await xivAppClient.Venue.GetRoomsAsync(venueId)).FirstOrDefault(r => r.RoomNumber == roomNumber);
+        var rooms = await xivAppClient.Venue.GetRoomsAsync(venueId);
+        if (rooms is null) return;
+        var room = rooms.FirstOrDefault(r => r.RoomNumber == roomNumber);
         var status = room switch
         {
           null => "not set up for this venue",
