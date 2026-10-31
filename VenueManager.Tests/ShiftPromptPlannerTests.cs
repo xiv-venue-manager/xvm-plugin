@@ -25,9 +25,61 @@ public class ShiftPromptPlannerTests
     }
 
     [Fact]
-    public void A_shift_that_has_not_started_yet_gets_no_prompt()
+    public void A_shift_more_than_thirty_minutes_away_gets_no_prompt()
     {
-        Assert.Empty(Plan(new[] { Shift(1, "scheduled", -10, 120) }));
+        Assert.Empty(Plan(new[] { Shift(1, "scheduled", -31, 120) }));
+        Assert.Empty(Plan(new[] { Shift(1, "scheduled", -45, 120) }));
+    }
+
+    [Theory]
+    [InlineData(30)]
+    [InlineData(10)]
+    [InlineData(1)]
+    public void A_shift_within_thirty_minutes_of_its_start_gets_one_heads_up(int minutesAway)
+    {
+        var shift = Shift(1, "scheduled", -minutesAway, 120);
+        Assert.Equal(new ShiftPrompt(1, "v1", PromptKind.Soon, Now.AddMinutes(minutesAway)), Assert.Single(Plan(new[] { shift })));
+
+        var remembered = new Dictionary<int, PromptMemory> { [1] = new(PromptKind.Soon, Now) };
+        Assert.Empty(Plan(new[] { shift }, remembered));
+    }
+
+    [Fact]
+    public void The_start_prompt_still_follows_the_heads_up()
+    {
+        var remembered = new Dictionary<int, PromptMemory> { [1] = new(PromptKind.Soon, Now.AddMinutes(-30)) };
+        Assert.Equal(new ShiftPrompt(1, "v1", PromptKind.Start), Assert.Single(Plan(new[] { Shift(1, "scheduled", 0, 120) }, remembered)));
+    }
+
+    [Fact]
+    public void A_muted_shift_gets_no_heads_up()
+    {
+        Assert.Empty(Plan(new[] { Shift(1, "scheduled", -10, 120) }, muted: new HashSet<int> { 1 }));
+    }
+
+    [Theory]
+    [InlineData("pending_approval")]
+    [InlineData("open")]
+    [InlineData("cancelled")]
+    [InlineData("completed")]
+    public void Only_approved_shifts_get_a_heads_up(string status)
+    {
+        Assert.Empty(Plan(new[] { Shift(1, status, -10, 120) }));
+    }
+
+    [Fact]
+    public void A_shift_that_is_already_clocked_in_gets_no_heads_up()
+    {
+        var early = new MyShift(1, "v1", "scheduled", Now.AddMinutes(10), Now.AddMinutes(130), Now.AddMinutes(-5), null);
+        Assert.Empty(Plan(new[] { early }));
+    }
+
+    [Fact]
+    public void Each_shift_gets_its_own_heads_up()
+    {
+        var due = Plan(new[] { Shift(1, "scheduled", -10, 120), Shift(2, "scheduled", -20, 120) });
+        Assert.Equal(new[] { 1, 2 }, due.Select(p => p.ShiftId));
+        Assert.All(due, p => Assert.Equal(PromptKind.Soon, p.Kind));
     }
 
     [Fact]
