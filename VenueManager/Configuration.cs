@@ -28,6 +28,7 @@ namespace VenueManager
     public bool showChatAlerts { get; set; } = false;
     public bool alertBannedPatrons { get; set; } = true;
     public bool shiftPrompts { get; set; } = true;
+    public bool followShiftVenue { get; set; } = true;
     public bool showChatAlertEntry { get; set; } = true;
     public bool showChatAlertReentry { get; set; } = true;
     public bool showChatAlertLeave { get; set; } = true;

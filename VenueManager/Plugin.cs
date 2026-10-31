@@ -78,6 +78,10 @@ namespace VenueManager
     public volatile ShiftDto? activeShift = null;
     private volatile ShiftDto? labelShift = null;
     private volatile string? labelShiftVenueId = null;
+    internal volatile ShiftVenueChoice? shiftVenueChoice = null;
+
+    public bool ShiftDecidesVenue => Configuration.followShiftVenue && shiftVenueChoice is { Kind: ShiftVenueChoiceKind.Venue };
+    public bool ShiftVenueConflict => Configuration.followShiftVenue && shiftVenueChoice is { Kind: ShiftVenueChoiceKind.Conflict };
     private long lastShiftPollMs = 0;
     private volatile bool shiftPollInFlight = false;
     private long lastBannedPollMs = 0;
@@ -296,7 +300,7 @@ namespace VenueManager
           }
         }
 
-        if (venueId == currentXivAppVenueId) return;
+        if (venueId == currentXivAppVenueId || ShiftDecidesVenue) return;
         currentXivAppVenueId = venueId;
         ResetShiftForVenueChange();
         Configuration.selectedVenueId = venueId;
@@ -1163,7 +1167,8 @@ namespace VenueManager
       var wantsLabel = Configuration.dtrDisplayMode is DtrDisplayMode.ShiftStatus or DtrDisplayMode.Combined
         || Configuration.enableGreeterMode || Configuration.enableReentryGreeter;
       var wantsPrompts = Configuration.shiftPrompts;
-      if (shiftPollInFlight || (!wantsLabel && !wantsPrompts)) return;
+      var wantsVenue = Configuration.followShiftVenue;
+      if (shiftPollInFlight || (!wantsLabel && !wantsPrompts && !wantsVenue)) return;
       var nowMs = Environment.TickCount64;
       if (nowMs - lastShiftPollMs < 30_000) return;
       if (xivAppClient?.Xvm is not { } xvm) return;
@@ -1178,6 +1183,7 @@ namespace VenueManager
           var all = await xvm.GetMyShiftsAsync(now);
           if (wantsLabel) UpdateShiftLabel(now, all);
           if (wantsPrompts) ShowDuePrompts(now, all);
+          if (wantsVenue) await FollowShiftVenueAsync(now, all);
         }
         catch (Exception ex)
         {
@@ -1199,6 +1205,47 @@ namespace VenueManager
       activeShift = here is null ? null : ToShiftDto(here);
       labelShift = anywhere is null ? null : ToShiftDto(anywhere);
       labelShiftVenueId = anywhere?.VenueId;
+    }
+
+    private async Task FollowShiftVenueAsync(DateTime now, List<MyShift> all)
+    {
+      var choice = ShiftVenuePicker.Pick(now, all);
+      var before = shiftVenueChoice;
+      shiftVenueChoice = choice;
+      if (ShiftVenuePicker.EnteredConflict(before, choice)) AnnounceShiftVenueConflict();
+      if (choice is not { Kind: ShiftVenueChoiceKind.Venue, VenueId: { } venueId } || venueId == currentXivAppVenueId) return;
+      var venue = xivAppVenues.Find(v => v.Id == venueId);
+      if (venue is null) return;
+
+      currentXivAppVenueId = venueId;
+      ResetShiftForVenueChange();
+      Configuration.selectedVenueId = venueId;
+      Configuration.Save();
+      var prefix = Configuration.showPluginNameInChat ? $"[{Name}] " : "";
+      Chat.Print($"{prefix}Switched to {venue.Name} for your shift.");
+      try
+      {
+        await LoadVenueDataAsync(venueId);
+      }
+      catch (Exception ex)
+      {
+        Log.Warning("Loading {0} after switching to it for a shift failed: {1}", venueId, ex.Message);
+      }
+    }
+
+    private void AnnounceShiftVenueConflict()
+    {
+      const string text = "Your running shifts are at more than one venue, so the plugin is not choosing a venue for you.";
+      var prefix = Configuration.showPluginNameInChat ? $"[{Name}] " : "";
+      Chat.Print(prefix + text);
+      Notifications.AddNotification(new Notification
+      {
+        Title = "Shifts at more than one venue",
+        Content = text,
+        Type = NotificationType.Warning,
+        InitialDuration = TimeSpan.FromMinutes(2),
+        UserDismissable = true,
+      });
     }
 
     private void ShowDuePrompts(DateTime now, List<MyShift> all)
