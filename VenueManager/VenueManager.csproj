@@ -2,12 +2,12 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
     <TargetFramework>net10.0-windows7.0</TargetFramework>
-    <Authors>Ehno</Authors>
+    <Authors>Ehno, AllegroVivo</Authors>
     <Company></Company>
-    <Version>3.11.0</Version>
+    <Version>4.0.0</Version>
     <AssemblyName>XIVVenueManagerSync</AssemblyName>
     <Description>In-game companion for xivvenuemanager.com — log patron visits, sales, and services without leaving FFXIV.</Description>
-    <Copyright>Copyright (c) Ehno</Copyright>
+    <Copyright>Copyright (c) Ehno, AllegroVivo</Copyright>
     <PackageProjectUrl>https://github.com/BluntEXE/XIVVenueManagerSync</PackageProjectUrl>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <IsPackable>false</IsPackable>

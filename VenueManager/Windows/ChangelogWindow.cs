@@ -39,7 +39,30 @@ public class ChangelogWindow : Window, IDisposable
 #else
     private static readonly ChangelogEntry[] Entries =
     [
-        new("v3.11.0", "August 2026", "Exterior Plot Tracking", IsCurrent: true,
+        new("v4.0.0", "November 2026", "A new way to link, and shifts you can clock into", IsCurrent: true,
+        [
+            "The plugin now talks to the new XIV Venue Manager system. Link it with a one-time code from the dashboard (API Keys, Generate link code). Old API keys no longer work, so everyone needs to link again, once.",
+            "Setup checklist at the top of Settings: link the account, link your current character, turn on XIV-App Sync. Your own visits are not logged until your character is linked.",
+            "Link and unlink your characters from Settings with the Link current character button.",
+            "Houses, apartments (main and subdivision) and FC houses are matched to your venues by address and saved automatically, and the plugin switches to the venue you are standing in.",
+            "Shift prompts: a Clock in button 30 minutes before a scheduled shift and when it starts, and Clock out when it runs past its end. Not now silences a shift. The status bar shows your shift at any venue you work at.",
+            "Join event shifts from the open board in the My Shift tab.",
+            "Rooms: reserve, release, lock, unlock and disable from the Rooms tab. Staff cannot lock or disable, managers can.",
+            "New Bans tab, always visible. Ban alerts and patron tracking keep working with the Patrons tab hidden.",
+            "Your own leave is now reported, and players already inside when you arrive are reported as present.",
+            "Chat tells you when a sale or tip is logged without a live event, and when a venue conflict is found.",
+            "Greeter Free Enable ignores your shift and venue.",
+            "A failed event or rooms lookup now shows as a failure instead of looking like an empty list.",
+        ]),
+
+        new("Known limits", "November 2026", "Not working yet", IsCurrent: false,
+        [
+            "The teleport button does not work for apartments, because Lifestream cannot be given an apartment address.",
+            "Every chamber in an FC house counts as a different house, so chambers are not saved as venues.",
+            "A patron who is still inside when the last staff member leaves stays shown as inside for a while.",
+        ]),
+
+        new("v3.11.0", "August 2026", "Exterior Plot Tracking", IsCurrent: false,
         [
             "Patron tracking now works from the plot exterior, not just the house interior",
             "New Rooms tab for room status, new Inventory tab linking drinks to real FFXIV items",

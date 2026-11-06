@@ -1,5 +1,5 @@
 {
-  "Author": "Ehno",
+  "Author": "Ehno, AllegroVivo",
   "Name": "XIV Venue Manager Sync (Dev)",
   "Punchline": "Test build of the XIV Venue Manager plugin. Talks to the dev API only.",
   "Description": "Test build of the XIV Venue Manager Sync plugin for the dev environment. It connects to dev-api.xivvenuemanager.com and never to the live service. Safe to install next to the normal plugin: it has its own settings, data and commands (/xvmdev).",
