@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -56,7 +57,11 @@ public class ShiftsTab : ITab
 
     ImGui.Separator();
 
-    if (shifts.Count == 0 && openShifts.Count == 0 && !loading)
+    var visibleOpenShifts = openShifts
+      .Where(shift => !string.IsNullOrEmpty(shift.RoleName) && plugin.xivAppRoles.Any(role => string.Equals(role.Name, shift.RoleName, StringComparison.OrdinalIgnoreCase)))
+      .OrderBy(GetOpenShiftStartDate)
+      .ToList();
+    if (shifts.Count == 0 && visibleOpenShifts.Count == 0 && !loading)
     {
       ThemeManager.EmptyState("No shifts scheduled.");
       ImGui.EndChild();
@@ -64,12 +69,22 @@ public class ShiftsTab : ITab
     }
 
     // --- Open shifts available to claim ---
-    if (openShifts.Count > 0)
+    if (visibleOpenShifts.Count > 0)
     {
       ImGui.Spacing();
       ThemeManager.SectionHeader("OPEN SHIFTS", ColorOpen);
-      foreach (var shift in openShifts)
+      DateTime? lastOpenShiftDate = null;
+      foreach (var shift in visibleOpenShifts)
+      {
+        var startDate = GetOpenShiftStartDate(shift);
+        if (startDate.HasValue && lastOpenShiftDate.HasValue && startDate.Value.Date != lastOpenShiftDate.Value.Date)
+        {
+          ImGui.Spacing();
+          ImGui.Separator();
+        }
+        if (startDate.HasValue) lastOpenShiftDate = startDate;
         drawOpenShiftRow(shift);
+      }
     }
 
     // Render shifts grouped: active first, then upcoming, then completed
@@ -77,6 +92,7 @@ public class ShiftsTab : ITab
     bool anyUpcoming = false;
     bool anyCompleted = false;
 
+    DateTime? lastDate = null;
     foreach (var shift in shifts)
     {
       if (shift.Status == "ACTIVE" && !anyActive)
@@ -85,9 +101,20 @@ public class ShiftsTab : ITab
         ImGui.Spacing();
         ThemeManager.SectionHeader("ON SHIFT", Colors.XivGreen);
       }
-      if (shift.Status == "ACTIVE") drawShiftRow(shift);
+      if (shift.Status == "ACTIVE")
+      {
+        var startDate = GetShiftStartDate(shift);
+        if (lastDate.HasValue && startDate.HasValue && startDate.Value.Date != lastDate.Value.Date)
+        {
+          ImGui.Spacing();
+          ImGui.Separator();
+        }
+        if (startDate.HasValue) lastDate = startDate;
+        drawShiftRow(shift);
+      }
     }
 
+    DateTime? lastUpcomingDate = null;
     foreach (var shift in shifts)
     {
       if (shift.Status == "SCHEDULED" && !anyUpcoming)
@@ -96,9 +123,20 @@ public class ShiftsTab : ITab
         ImGui.Spacing();
         ThemeManager.SectionHeader("UPCOMING", Colors.XivSubtext0);
       }
-      if (shift.Status == "SCHEDULED") drawShiftRow(shift);
+      if (shift.Status == "SCHEDULED")
+      {
+        var startDate = GetShiftStartDate(shift);
+        if (lastUpcomingDate.HasValue && startDate.HasValue && startDate.Value.Date != lastUpcomingDate.Value.Date)
+        {
+          ImGui.Spacing();
+          ImGui.Separator();
+        }
+        if (startDate.HasValue) lastUpcomingDate = startDate;
+        drawShiftRow(shift);
+      }
     }
 
+    DateTime? lastCompletedDate = null;
     foreach (var shift in shifts)
     {
       if (shift.Status == "COMPLETED" && !anyCompleted)
@@ -107,7 +145,17 @@ public class ShiftsTab : ITab
         ImGui.Spacing();
         ThemeManager.SectionHeader("COMPLETED", Colors.XivOverlay0);
       }
-      if (shift.Status == "COMPLETED") drawShiftRow(shift);
+      if (shift.Status == "COMPLETED")
+      {
+        var startDate = GetShiftStartDate(shift);
+        if (lastCompletedDate.HasValue && startDate.HasValue && startDate.Value.Date != lastCompletedDate.Value.Date)
+        {
+          ImGui.Spacing();
+          ImGui.Separator();
+        }
+        if (startDate.HasValue) lastCompletedDate = startDate;
+        drawShiftRow(shift);
+      }
     }
 
     // --- Status line ---
@@ -118,6 +166,20 @@ public class ShiftsTab : ITab
     }
 
     ImGui.EndChild();
+  }
+
+  private static DateTime? GetOpenShiftStartDate(OpenShiftDto shift)
+  {
+    return DateTime.TryParse(shift.ScheduledStart, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var startUtc)
+      ? startUtc.ToLocalTime()
+      : null;
+  }
+
+  private static DateTime? GetShiftStartDate(ShiftDto shift)
+  {
+    return DateTime.TryParse(shift.ScheduledStart, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var startUtc)
+      ? startUtc.ToLocalTime()
+      : null;
   }
 
   private void drawOpenShiftRow(OpenShiftDto shift)
@@ -141,10 +203,13 @@ public class ShiftsTab : ITab
 
     ImGui.TextColored(ColorOpen, timeLabel);
 
-    if (!string.IsNullOrEmpty(shift.RoleName))
+    var roleLabel = shift.RoleName;
+    if (!string.IsNullOrEmpty(shift.EventTitle))
+      roleLabel = string.IsNullOrEmpty(roleLabel) ? shift.EventTitle : $"{roleLabel} — {shift.EventTitle}";
+    if (!string.IsNullOrEmpty(roleLabel))
     {
       ImGui.SameLine();
-      ImGui.TextDisabled($"({shift.RoleName})");
+      ImGui.TextDisabled($"({roleLabel})");
     }
 
     string btnLabel = $"Claim##{shift.Id}";
@@ -271,6 +336,7 @@ public class ShiftsTab : ITab
       var response = await plugin.xivAppClient.Shift.GetShiftsResponseAsync(plugin.currentXivAppVenueId);
       shifts = response.Shifts;
       openShifts = response.OpenShifts;
+      await plugin.RefreshRolesAsync(plugin.currentXivAppVenueId);
       lastFetch = DateTime.Now;
     }
     catch (Exception ex)

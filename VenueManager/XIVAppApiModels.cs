@@ -167,6 +167,9 @@ namespace VenueManager
 
     [JsonPropertyName("roleName")]
     public string? RoleName { get; set; }
+
+    [JsonPropertyName("eventTitle")]
+    public string? EventTitle { get; set; }
   }
 
   public class ShiftsResponse
