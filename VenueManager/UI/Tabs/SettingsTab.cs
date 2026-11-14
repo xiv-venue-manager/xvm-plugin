@@ -588,9 +588,10 @@ public class SettingsTab : ITab
 
     ImGui.InputTextWithHint("Link code", "ABCD-1234", ref pairingCode, 16);
     ImGui.SameLine();
-    if (linking) ImGui.BeginDisabled();
-    if (ImGui.Button("Link") && !linking) _ = LinkAccountAsync();
-    if (linking) ImGui.EndDisabled();
+    var linkDisabled = linking;
+    if (linkDisabled) ImGui.BeginDisabled();
+    if (ImGui.Button("Link") && !linkDisabled) _ = LinkAccountAsync();
+    if (linkDisabled) ImGui.EndDisabled();
     ImGui.TextDisabled($"Get a code at {XvmApiPairing.WebUrl.Replace("https://", "")}/dashboard/api-keys.");
     if (!string.IsNullOrEmpty(linkStatus)) ImGui.TextColored(linkStatusColor, linkStatus);
     ImGui.Spacing();
