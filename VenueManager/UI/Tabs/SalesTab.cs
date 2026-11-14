@@ -21,6 +21,7 @@ public class SalesTab : ITab
   // Form state — persists across frames because the tab instance is
   // long-lived (constructed once in MainWindow).
   private int selectedServiceIndex = 0; // 0 = "(no service)"
+  private string serviceFilter = string.Empty;
   private string customerName = string.Empty;
   private string amountText = "0";
   private string notes = string.Empty;
@@ -101,14 +102,18 @@ public class SalesTab : ITab
     ImGui.TextColored(Colors.XivSubtext0, "Service");
     if (ImGui.BeginCombo("##sales-service", selectedLabel))
     {
+      if (ImGui.IsWindowAppearing()) ImGui.SetKeyboardFocusHere();
+      ImGui.InputTextWithHint("##sales-service-filter", "Filter", ref serviceFilter, 64);
       bool noneSelected = selectedServiceIndex == 0;
       if (ImGui.Selectable("(no service)", noneSelected))
         selectedServiceIndex = 0;
       if (noneSelected) ImGui.SetItemDefaultFocus();
 
+      var visible = ServiceFilter.Apply(services, serviceFilter);
       for (int i = 0; i < services.Count; i++)
       {
         var svc = services[i];
+        if (!visible.Contains(svc)) continue;
         bool isSelected = selectedServiceIndex == i + 1;
         var label = $"{svc.Name} — {svc.Price}g";
         if (svc.StockCount.HasValue)
