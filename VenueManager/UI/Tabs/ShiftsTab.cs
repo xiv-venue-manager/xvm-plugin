@@ -57,10 +57,7 @@ public class ShiftsTab : ITab
 
     ImGui.Separator();
 
-    var visibleOpenShifts = openShifts
-      .Where(shift => !string.IsNullOrEmpty(shift.RoleName) && plugin.xivAppRoles.Any(role => string.Equals(role.Name, shift.RoleName, StringComparison.OrdinalIgnoreCase)))
-      .OrderBy(GetOpenShiftStartDate)
-      .ToList();
+    var visibleOpenShifts = OpenShiftBoard.Visible(openShifts, plugin.xivAppRoles);
     if (shifts.Count == 0 && visibleOpenShifts.Count == 0 && !loading)
     {
       ThemeManager.EmptyState("No shifts scheduled.");
@@ -76,13 +73,7 @@ public class ShiftsTab : ITab
       DateTime? lastOpenShiftDate = null;
       foreach (var shift in visibleOpenShifts)
       {
-        var startDate = GetOpenShiftStartDate(shift);
-        if (startDate.HasValue && lastOpenShiftDate.HasValue && startDate.Value.Date != lastOpenShiftDate.Value.Date)
-        {
-          ImGui.Spacing();
-          ImGui.Separator();
-        }
-        if (startDate.HasValue) lastOpenShiftDate = startDate;
+        DrawDateBreak(ref lastOpenShiftDate, shift.ScheduledStart);
         drawOpenShiftRow(shift);
       }
     }
@@ -103,13 +94,7 @@ public class ShiftsTab : ITab
       }
       if (shift.Status == "ACTIVE")
       {
-        var startDate = GetShiftStartDate(shift);
-        if (lastDate.HasValue && startDate.HasValue && startDate.Value.Date != lastDate.Value.Date)
-        {
-          ImGui.Spacing();
-          ImGui.Separator();
-        }
-        if (startDate.HasValue) lastDate = startDate;
+        DrawDateBreak(ref lastDate, shift.ScheduledStart);
         drawShiftRow(shift);
       }
     }
@@ -125,13 +110,7 @@ public class ShiftsTab : ITab
       }
       if (shift.Status == "SCHEDULED")
       {
-        var startDate = GetShiftStartDate(shift);
-        if (lastUpcomingDate.HasValue && startDate.HasValue && startDate.Value.Date != lastUpcomingDate.Value.Date)
-        {
-          ImGui.Spacing();
-          ImGui.Separator();
-        }
-        if (startDate.HasValue) lastUpcomingDate = startDate;
+        DrawDateBreak(ref lastUpcomingDate, shift.ScheduledStart);
         drawShiftRow(shift);
       }
     }
@@ -147,13 +126,7 @@ public class ShiftsTab : ITab
       }
       if (shift.Status == "COMPLETED")
       {
-        var startDate = GetShiftStartDate(shift);
-        if (lastCompletedDate.HasValue && startDate.HasValue && startDate.Value.Date != lastCompletedDate.Value.Date)
-        {
-          ImGui.Spacing();
-          ImGui.Separator();
-        }
-        if (startDate.HasValue) lastCompletedDate = startDate;
+        DrawDateBreak(ref lastCompletedDate, shift.ScheduledStart);
         drawShiftRow(shift);
       }
     }
@@ -168,18 +141,15 @@ public class ShiftsTab : ITab
     ImGui.EndChild();
   }
 
-  private static DateTime? GetOpenShiftStartDate(OpenShiftDto shift)
+  private static void DrawDateBreak(ref DateTime? last, string scheduledStart)
   {
-    return DateTime.TryParse(shift.ScheduledStart, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var startUtc)
-      ? startUtc.ToLocalTime()
-      : null;
-  }
-
-  private static DateTime? GetShiftStartDate(ShiftDto shift)
-  {
-    return DateTime.TryParse(shift.ScheduledStart, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var startUtc)
-      ? startUtc.ToLocalTime()
-      : null;
+    var start = ShiftDates.LocalStart(scheduledStart);
+    if (ShiftDates.BreakBetween(last, start))
+    {
+      ImGui.Spacing();
+      ImGui.Separator();
+    }
+    if (start.HasValue) last = start;
   }
 
   private void drawOpenShiftRow(OpenShiftDto shift)
