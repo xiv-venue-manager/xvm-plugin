@@ -60,6 +60,10 @@ The harness only talks to `dev-api.xivvenuemanager.com`, with no override. Reads
 
 Known limits: some saves and the doorbell fail on Linux and are logged (see `state`); two text items on one line read back as one.
 
+## Native window
+
+`dotnet run --project VenueManager.Harness -- window` opens the plugin in a native window so you can click and type in the real UI. Close it with the window's close button (Escape goes to the plugin). The frame is rasterized on the CPU, so Release builds (`-c Release`) feel much smoother. Clipboard copy and paste are not supported. A tiling compositor may resize the window; the picture then stretches and the mouse is scaled to match. `--window-shot PATH` is the self-test: it renders 30 frames, writes the window contents to PATH and exits.
+
 ## Run the tests
 
 ```bash
