@@ -44,6 +44,25 @@ public sealed class ImGuiHost : IDisposable
         }
     }
 
+    public void Tap(float x, float y)
+    {
+        io.AddMousePosEvent(x, y);
+        Step(2);
+        io.AddMouseButtonEvent(0, true);
+        Step(1);
+        io.AddMouseButtonEvent(0, false);
+        Step(2);
+    }
+
+    public bool TapText(string text)
+    {
+        var run = ReadText().FirstOrDefault(r => r.Text == text);
+        if (run is null) return false;
+
+        Tap(run.CenterX, run.CenterY);
+        return true;
+    }
+
     public unsafe IReadOnlyList<TextRun> ReadText()
     {
         var runs = new List<TextRun>();

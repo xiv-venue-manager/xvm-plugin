@@ -39,4 +39,56 @@ public class ImGuiHostTests
         Assert.True(hello.Right > hello.X);
         Assert.True(hello.Bottom > hello.Y);
     }
+
+    [Fact]
+    public void TapText_clicks_the_button_with_that_label()
+    {
+        var claims = 0;
+        using var host = new ImGuiHost(400, 300)
+        {
+            Draw = () =>
+            {
+                ImGui.SetNextWindowPos(new Vector2(10, 10));
+                ImGui.Begin("Spike");
+                if (ImGui.Button("Claim")) claims++;
+                ImGui.End();
+            }
+        };
+        host.Step(3);
+
+        var found = host.TapText("Claim");
+
+        Assert.True(found);
+        Assert.Equal(1, claims);
+    }
+
+    [Fact]
+    public void TapText_returns_false_when_no_text_matches()
+    {
+        using var host = new ImGuiHost(400, 300) { Draw = DrawSpike };
+        host.Step(3);
+
+        Assert.False(host.TapText("Nope"));
+    }
+
+    [Fact]
+    public void A_tap_outside_any_button_does_not_click_it()
+    {
+        var claims = 0;
+        using var host = new ImGuiHost(400, 300)
+        {
+            Draw = () =>
+            {
+                ImGui.SetNextWindowPos(new Vector2(10, 10));
+                ImGui.Begin("Spike");
+                if (ImGui.Button("Claim")) claims++;
+                ImGui.End();
+            }
+        };
+        host.Step(3);
+
+        host.Tap(300, 250);
+
+        Assert.Equal(0, claims);
+    }
 }
