@@ -211,8 +211,10 @@ public sealed class PluginHost : IDisposable
         var version = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "";
         if (!string.IsNullOrEmpty(options.ConfigPath))
         {
+            var assembly = typeof(Plugin).Assembly.GetName().Name!;
+            var text = File.ReadAllText(options.ConfigPath).Replace("XIVVenueManagerSyncDev", assembly);
             var loaded = JsonConvert.DeserializeObject<Configuration>(
-                File.ReadAllText(options.ConfigPath),
+                text,
                 new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.Objects })
                 ?? throw new InvalidDataException("Config file did not contain a plugin configuration");
             loaded.LastSeenVersion = version;

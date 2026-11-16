@@ -102,10 +102,23 @@ public class PluginHostTests
         Assert.DoesNotContain(texts, t => t == "?" || t.StartsWith("? ") || t.Contains(" ? "));
     }
 
-    private static string TempConfig(string url)
+    [Fact]
+    public void Loads_a_config_saved_by_the_dev_build()
+    {
+        var path = TempConfig("http://127.0.0.1:1", "XIVVenueManagerSyncDev");
+        try
+        {
+            using var host = PluginHost.Start(new HarnessOptions(ConfigPath: path));
+
+            Assert.Equal("abc", host.Configuration.selectedVenueId);
+        }
+        finally { File.Delete(path); }
+    }
+
+    private static string TempConfig(string url, string? assemblyName = null)
     {
         var path = Path.Combine(Path.GetTempPath(), "vm-harness-test-" + Guid.NewGuid().ToString("N") + ".json");
-        var assembly = typeof(VenueManager.Plugin).Assembly.GetName().Name;
+        var assembly = assemblyName ?? typeof(VenueManager.Plugin).Assembly.GetName().Name;
         File.WriteAllText(path, $$"""
             {
               "$type": "VenueManager.Configuration, {{assembly}}",
