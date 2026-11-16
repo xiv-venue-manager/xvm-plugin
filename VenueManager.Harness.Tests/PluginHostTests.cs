@@ -89,4 +89,16 @@ public class PluginHostTests
 
         Assert.True(host.Tree().Count > 5);
     }
+
+    [Fact]
+    public void Draws_symbols_not_question_marks()
+    {
+        using var host = PluginHost.Start(new HarnessOptions());
+
+        host.Open("Main");
+        host.Step(4);
+
+        var texts = host.Tree().Select(line => line[(line.IndexOf(") ") + 2)..]).ToList();
+        Assert.DoesNotContain(texts, t => t == "?" || t.StartsWith("? ") || t.Contains(" ? "));
+    }
 }

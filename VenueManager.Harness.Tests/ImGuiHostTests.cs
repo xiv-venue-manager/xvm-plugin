@@ -145,4 +145,28 @@ public class ImGuiHostTests
 
         Assert.Contains(host.ReadText(), r => r.Text == "\uF013");
     }
+
+    private static string TextFontPath => Path.Combine(
+        Environment.GetEnvironmentVariable("AETHERPHONE_HARNESS_CACHE") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".aetherphone-harness"),
+        "assets", "UIRes", "NotoSansCJKjp-Medium.otf");
+
+    [Fact]
+    public void ReadText_reads_symbols_from_the_text_font()
+    {
+        using var host = new ImGuiHost(400, 300, iconFontPath: null, textFontPath: TextFontPath);
+        host.Draw = () =>
+        {
+            ImGui.SetNextWindowPos(new Vector2(10, 10));
+            ImGui.Begin("Symbols");
+            ImGui.Text("\u2713 Link your account");
+            ImGui.Text("\u25CF \u25CB");
+            ImGui.End();
+        };
+
+        host.Step(3);
+
+        var runs = host.ReadText();
+        Assert.Contains(runs, r => r.Text == "\u2713 Link your account");
+        Assert.Contains(runs, r => r.Text == "\u25CF \u25CB");
+    }
 }

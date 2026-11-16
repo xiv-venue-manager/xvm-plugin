@@ -16,6 +16,9 @@ public sealed class ImGuiHost : IDisposable
     private readonly int width;
     private readonly int height;
     private readonly unsafe ushort* iconRanges;
+    private readonly unsafe ushort* textRanges;
+
+    private const float TextFontSize = 17f;
 
     public bool HasIconFont { get; }
 
@@ -23,7 +26,7 @@ public sealed class ImGuiHost : IDisposable
 
     public Action Draw { get; set; } = () => { };
 
-    public unsafe ImGuiHost(int width, int height, string? iconFontPath = null)
+    public unsafe ImGuiHost(int width, int height, string? iconFontPath = null, string? textFontPath = null)
     {
         ImGui.CreateContext();
         io = ImGui.GetIO();
@@ -31,7 +34,18 @@ public sealed class ImGuiHost : IDisposable
         io.DisplaySize = new Vector2(width, height);
         io.DeltaTime = 1f / 60f;
 
-        io.Fonts.AddFontDefault();
+        if (textFontPath is not null && File.Exists(textFontPath))
+        {
+            ushort[] ranges = { 0x0020, 0x00FF, 0x2000, 0x206F, 0x2190, 0x21FF, 0x2500, 0x27BF, 0 };
+            textRanges = (ushort*)NativeMemory.Alloc((nuint)(ranges.Length * sizeof(ushort)));
+            for (var i = 0; i < ranges.Length; i++) textRanges[i] = ranges[i];
+            io.Fonts.AddFontFromFileTTF(textFontPath, TextFontSize, ImFontConfigPtr.Null, textRanges);
+        }
+        else
+        {
+            io.Fonts.AddFontDefault();
+        }
+
         if (iconFontPath is not null && File.Exists(iconFontPath))
         {
             iconRanges = (ushort*)NativeMemory.Alloc(3 * sizeof(ushort));
@@ -168,5 +182,6 @@ public sealed class ImGuiHost : IDisposable
     {
         ImGui.DestroyContext();
         NativeMemory.Free(iconRanges);
+        NativeMemory.Free(textRanges);
     }
 }

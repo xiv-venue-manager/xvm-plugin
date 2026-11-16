@@ -70,7 +70,7 @@ public sealed class PluginHost : IDisposable
                 .SetValue(null, Fake.Make(service));
         }
 
-        imgui = new ImGuiHost(width, height, IconFontPath());
+        imgui = new ImGuiHost(width, height, FontPath("FontAwesomeFreeSolid.otf"), FontPath("NotoSansCJKjp-Medium.otf"));
         IconFont.Font = () => imgui.HasIconFont ? imgui.IconFontHandle : ImGui.GetFont();
         IconFont.IconButton = icon => IconButton(icon, $"##{icon}");
         IconFont.IconButtonWithId = (id, icon) => IconButton(icon, id);
@@ -117,11 +117,11 @@ public sealed class PluginHost : IDisposable
         return char.IsDigit(name[0]) ? $"[U+{(int)c:X4}]" : $"[{name}]";
     }));
 
-    private static string? IconFontPath()
+    private static string FontPath(string file)
     {
         var root = Environment.GetEnvironmentVariable("AETHERPHONE_HARNESS_CACHE");
         if (string.IsNullOrEmpty(root)) root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".aetherphone-harness");
-        return Path.Combine(root, "assets", "UIRes", "FontAwesomeFreeSolid.otf");
+        return Path.Combine(root, "assets", "UIRes", file);
     }
 
     private bool IconButton(Dalamud.Interface.FontAwesomeIcon icon, string id)

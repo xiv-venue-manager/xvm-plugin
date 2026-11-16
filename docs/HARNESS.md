@@ -9,6 +9,7 @@ It boots the real `Plugin` against fake Dalamud services, draws its windows thro
 - .NET 10 SDK.
 - Dalamud's files, normally in `~/.xlcore/dalamud/Hooks/dev` (set `DALAMUD_HOME` to use another folder).
 - `libcimgui.so` in `~/.aetherphone-harness/native`, built by Aetherphone's harness bootstrap (set `AETHERPHONE_HARNESS_CACHE` to use another cache). The build copies it next to the output as `cimgui.dll`.
+- The harness also draws with Noto Sans CJK JP and FontAwesome from the same cache folder (`assets/UIRes`), and falls back to ImGui's default font when the files are missing.
 
 If the installed Dalamud ImGui bindings differ from the harness cache, the command line stops with a message. Re-run Aetherphone's harness bootstrap.
 
@@ -46,7 +47,7 @@ XVM_HARNESS_URL=http://127.0.0.1:8000 XVM_HARNESS_SECRET=<pairing secret> \
 
 A secret needs an explicit URL, so the harness never contacts the production API by accident. Use a local or dev xvm-api. The plugin's own settings and venue data are never read or written: the harness uses a temporary folder.
 
-Known limits: sidebar icons read back as `?` (use `tabs` and `tab` instead); some saves and the doorbell fail on Linux and are logged (see `state`); two text items on one line read back as one.
+Known limits: some saves and the doorbell fail on Linux and are logged (see `state`); two text items on one line read back as one.
 
 ## Run the tests
 
