@@ -146,4 +146,62 @@ public class PluginHostTests
     [InlineData(null)]
     public void CheckApiUrl_refuses_everything_else(string? url) =>
         Assert.Throws<ArgumentException>(() => PluginHost.CheckApiUrl(url));
+
+    private static PluginHost SeededHost()
+    {
+        var host = PluginHost.Start(new HarnessOptions("http://127.0.0.1:1", null));
+        host.Plugin.xivAppVenues.AddRange(new[]
+        {
+            new VenueManager.XIVAppVenue { Id = "id-1", Slug = "alpha-one", Name = "Alpha" },
+            new VenueManager.XIVAppVenue { Id = "id-2", Slug = "alpha-two", Name = "Alpha" },
+            new VenueManager.XIVAppVenue { Id = "id-3", Slug = "beta", Name = "Beta Lounge" },
+        });
+        return host;
+    }
+
+    [Fact]
+    public void Venues_lists_the_loaded_venues()
+    {
+        using var host = SeededHost();
+
+        Assert.Equal(new[] { ("id-1", "alpha-one", "Alpha"), ("id-2", "alpha-two", "Alpha"), ("id-3", "beta", "Beta Lounge") }, host.Venues);
+    }
+
+    [Fact]
+    public void SelectVenue_by_slug_sets_the_plugin_and_configuration()
+    {
+        using var host = SeededHost();
+
+        Assert.True(host.SelectVenue("ALPHA-TWO"));
+        Assert.Equal("id-2", host.Plugin.currentXivAppVenueId);
+        Assert.Equal("id-2", host.Configuration.selectedVenueId);
+    }
+
+    [Fact]
+    public void SelectVenue_by_id_works()
+    {
+        using var host = SeededHost();
+
+        Assert.True(host.SelectVenue("id-3"));
+        Assert.Equal("id-3", host.Plugin.currentXivAppVenueId);
+    }
+
+    [Fact]
+    public void SelectVenue_by_a_unique_name_works()
+    {
+        using var host = SeededHost();
+
+        Assert.True(host.SelectVenue("beta lounge"));
+        Assert.Equal("id-3", host.Configuration.selectedVenueId);
+    }
+
+    [Fact]
+    public void SelectVenue_refuses_a_duplicated_name_and_an_unknown_key()
+    {
+        using var host = SeededHost();
+
+        Assert.False(host.SelectVenue("Alpha"));
+        Assert.False(host.SelectVenue("nope"));
+        Assert.Null(host.Plugin.currentXivAppVenueId);
+    }
 }

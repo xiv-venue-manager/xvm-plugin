@@ -197,4 +197,26 @@ public class CliTests
         Assert.Contains("linked: no", output);
         Assert.Contains("link rejected: no", output);
     }
+
+    [Fact]
+    public void Venues_on_a_fresh_host_says_none_loaded()
+    {
+        Assert.Contains("(none loaded yet)", Run("venues\nquit\n"));
+    }
+
+    [Fact]
+    public void Venues_and_venue_print_and_select()
+    {
+        using var host = PluginHost.Start(new HarnessOptions("http://127.0.0.1:1", null));
+        host.Plugin.xivAppVenues.Add(new VenueManager.XIVAppVenue { Id = "id-1", Slug = "alpha-one", Name = "Alpha" });
+        var output = new StringWriter();
+
+        new Cli(host).Run(new StringReader("venues\nvenue alpha-one\nvenue nope\nquit\n"), output);
+
+        var text = output.ToString();
+        Assert.Contains("alpha-one  Alpha", text);
+        Assert.Contains("venue: Alpha (alpha-one)", text);
+        Assert.Contains("no venue: nope", text);
+        Assert.Equal("id-1", host.Configuration.selectedVenueId);
+    }
 }

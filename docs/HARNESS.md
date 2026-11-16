@@ -34,8 +34,12 @@ printf 'open Main\ntabs\ntree\nquit\n' | dotnet run --project VenueManager.Harne
 | `shot PATH` | Writes a PNG screenshot |
 | `link CODE` | Exchanges a dev pairing code for a session, saves it and links the plugin |
 | `unlink` | Deletes the saved session and unlinks the plugin |
+| `venues` | Lists the loaded venues as `<slug>  <name>`, or `(none loaded yet)` |
+| `venue KEY` | Selects a venue by id, slug or unique name, like picking it in Settings |
 | `state` | Prints the selected tab, the number of logged errors and warnings, `linked: yes\|no` and `link rejected: yes\|no` |
 | `quit` | Stops |
+
+Venues load in the background after linking, so run `wait` first. Names can repeat, so use the slug.
 
 Do not `tap` buttons that open links ("Open xivvenuemanager.com"): the plugin opens them in your browser.
 

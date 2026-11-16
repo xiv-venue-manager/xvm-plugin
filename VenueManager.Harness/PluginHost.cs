@@ -125,6 +125,34 @@ public sealed class PluginHost : IDisposable
 
     public Configuration Configuration => plugin.Configuration;
 
+    public Plugin Plugin => plugin;
+
+    public IReadOnlyList<(string Id, string Slug, string Name)> Venues =>
+        plugin.xivAppVenues.Select(v => (v.Id, v.Slug, v.Name)).ToList();
+
+    public bool SelectVenue(string key)
+    {
+        var venues = plugin.xivAppVenues.ToList();
+        var venue = venues.FirstOrDefault(v => string.Equals(v.Id, key, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(v.Slug, key, StringComparison.OrdinalIgnoreCase));
+        if (venue is null)
+        {
+            var named = venues.Where(v => string.Equals(v.Name, key, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (named.Count != 1) return false;
+            venue = named[0];
+        }
+
+        plugin.Configuration.selectedVenueId = venue.Id;
+        plugin.Configuration.Save();
+        plugin.currentXivAppVenueId = venue.Id;
+        plugin.ResetShiftForVenueChange();
+        _ = Task.Run(async () =>
+        {
+            try { await plugin.LoadVenueDataAsync(venue.Id); } catch { }
+        });
+        return true;
+    }
+
     public IReadOnlyList<string> Tabs => TabList().Select(TabName).ToList();
 
     public string CurrentTab => TabName(CurrentTabField().GetValue(MainWindow())!);

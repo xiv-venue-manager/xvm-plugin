@@ -68,6 +68,22 @@ public sealed class Cli
                 }
 
                 break;
+            case "venues":
+                if (host.Venues.Count == 0) output.WriteLine("(none loaded yet)");
+                foreach (var (_, slug, name) in host.Venues) output.WriteLine($"{slug}  {name}");
+                break;
+            case "venue":
+                if (host.SelectVenue(rest))
+                {
+                    var chosen = host.Venues.First(v => v.Id == host.Configuration.selectedVenueId);
+                    output.WriteLine($"venue: {chosen.Name} ({chosen.Slug})");
+                }
+                else
+                {
+                    output.WriteLine($"no venue: {rest}");
+                }
+
+                break;
             case "tap":
                 output.WriteLine(host.Tap(rest) ? $"tapped: {rest}" : $"not found: {rest}");
                 break;
