@@ -63,4 +63,16 @@ public class ScreenshotTests
         var inside = (150 * 400 + 100) * 4;
         Assert.NotEqual(new byte[] { 14, 18, 28 }, pixels[inside..(inside + 3)]);
     }
+
+    [Fact]
+    public void Resize_changes_the_screenshot_size()
+    {
+        using var host = Spike();
+
+        host.Resize(500, 320);
+        host.Step(2);
+
+        Assert.Equal((500, 320), (host.Width, host.Height));
+        Assert.Equal(500 * 320 * 4, host.Screenshot().Length);
+    }
 }

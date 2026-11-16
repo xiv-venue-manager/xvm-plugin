@@ -223,4 +223,20 @@ public class PluginHostTests
 
         Assert.Equal("http://127.0.0.1:1", host.Configuration.xvmApiUrl);
     }
+
+    [Fact]
+    public void Resize_changes_the_size_and_moves_the_link_button()
+    {
+        using var host = PluginHost.Start(new HarnessOptions());
+        host.Open("Main");
+        host.Step(4);
+        var before = host.Imgui.ReadText().Single(r => r.Text == "Link").X;
+
+        host.Resize(host.Width + 200, host.Height + 100);
+        host.Step(4);
+
+        Assert.Equal((1100, 800), (host.Width, host.Height));
+        var after = host.Imgui.ReadText().Single(r => r.Text == "Link").X;
+        Assert.True(after > before + 100, $"{before} -> {after}");
+    }
 }

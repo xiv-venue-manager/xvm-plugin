@@ -45,15 +45,13 @@ public sealed class PluginHost : IDisposable
     public string ApiUrl { get; }
     public bool Linked => plugin.xivAppClient?.IsConfigured == true;
     public bool LinkRejected => plugin.xivAppClient?.LinkRejected == true;
-    public int Width { get; }
-    public int Height { get; }
+    public int Width => imgui.Width;
+    public int Height => imgui.Height;
     public IReadOnlyList<string> Log => logLines;
 
     private PluginHost(Configuration config, int width, int height, string apiUrl)
     {
         ApiUrl = apiUrl;
-        Width = width;
-        Height = height;
         configDir = Path.Combine(Path.GetTempPath(), "vm-harness-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(configDir);
 
@@ -166,6 +164,8 @@ public sealed class PluginHost : IDisposable
         window.IsOpen = true;
         open = window;
     }
+
+    public void Resize(int width, int height) => imgui.Resize(width, height);
 
     public void Step(int frames = 1) => imgui.Step(frames);
 

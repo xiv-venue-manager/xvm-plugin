@@ -62,7 +62,7 @@ Known limits: some saves and the doorbell fail on Linux and are logged (see `sta
 
 ## Native window
 
-`dotnet run --project VenueManager.Harness -- window` opens the plugin in a native window so you can click and type in the real UI. Close it with the window's close button (Escape goes to the plugin). The frame is rasterized on the CPU, so Release builds (`-c Release`) feel much smoother. Clipboard copy and paste are not supported. A tiling compositor may resize the window; the picture then stretches and the mouse is scaled to match. `--window-shot PATH` is the self-test: it renders 30 frames, writes the window contents to PATH and exits.
+`dotnet run --project VenueManager.Harness -- window` opens the plugin in a native window so you can click and type in the real UI. Close it with the window's close button (Escape goes to the plugin). The window resizes freely and the plugin redraws at the new size, so tiling window managers such as niri are fine. The frame is rasterized on the CPU, so run `dotnet run -c Release --project VenueManager.Harness -- window` for a smooth window. Clipboard copy and paste are not supported. `--window-shot PATH` is the self-test: it renders 30 frames, writes the window contents to PATH and exits.
 
 ## Run the tests
 

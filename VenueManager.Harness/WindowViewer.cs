@@ -28,6 +28,8 @@ void main()
 
     private const double StepSeconds = 0.033;
     private const int SelfTestFrames = 30;
+    private const int MinWidth = 400;
+    private const int MinHeight = 300;
 
     public static int Run(PluginHost host, string? shotPath = null)
     {
@@ -35,7 +37,7 @@ void main()
         {
             Size = new Silk.NET.Maths.Vector2D<int>(host.Width, host.Height),
             Title = "XIV Venue Manager (harness, dev API)",
-            WindowBorder = WindowBorder.Fixed,
+            WindowBorder = WindowBorder.Resizable,
             VSync = true,
             API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.ForwardCompatible, new APIVersion(3, 3)),
         };
@@ -50,6 +52,18 @@ void main()
         var frames = 0;
         var uploads = 0;
         var uploadMs = 0.0;
+
+        void Fit()
+        {
+            if (gl is null) return;
+            var logical = window.Size;
+            if (logical.X < MinWidth || logical.Y < MinHeight) return;
+            if (logical.X == host.Width && logical.Y == host.Height) return;
+            host.Resize(logical.X, logical.Y);
+            gl.BindTexture(TextureTarget.Texture2D, texture);
+            gl.TexImage2D<byte>(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, (uint)host.Width, (uint)host.Height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, ReadOnlySpan<byte>.Empty);
+            first = true;
+        }
 
         window.Load += () =>
         {
@@ -123,9 +137,13 @@ void main()
             }
         };
 
+        window.Resize += _ => Fit();
+        window.FramebufferResize += _ => Fit();
+
         window.Render += delta =>
         {
             var g = gl!;
+            Fit();
             sinceStep += delta;
             if (first || sinceStep >= StepSeconds)
             {
@@ -157,7 +175,7 @@ void main()
             {
                 WriteShot(g, size.X, size.Y, shotPath);
                 Console.WriteLine($"window shot written: {shotPath}");
-                Console.WriteLine($"size {window.Size} framebuffer {window.FramebufferSize}");
+                Console.WriteLine($"size {window.Size} framebuffer {window.FramebufferSize} host {host.Width}x{host.Height} png {size.X}x{size.Y}");
                 Console.WriteLine($"rasterize+upload: {uploadMs / Math.Max(uploads, 1):F2} ms average over {uploads} uploads");
                 window.Close();
             }

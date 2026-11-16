@@ -13,8 +13,6 @@ public sealed class ImGuiHost : IDisposable
     private readonly byte[] atlas;
     private readonly int atlasWidth;
     private readonly int atlasHeight;
-    private readonly int width;
-    private readonly int height;
     private readonly unsafe ushort* iconRanges;
     private readonly unsafe ushort* textRanges;
 
@@ -25,6 +23,10 @@ public sealed class ImGuiHost : IDisposable
         NativeLibrary.SetDllImportResolver(typeof(ImGui).Assembly, (name, _, _) =>
             name == "cimgui" ? NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, "cimgui.dll")) : IntPtr.Zero);
     }
+
+    public int Width { get; private set; }
+
+    public int Height { get; private set; }
 
     public bool HasIconFont { get; }
 
@@ -68,8 +70,8 @@ public sealed class ImGuiHost : IDisposable
         atlasWidth = w;
         atlasHeight = h;
         atlas = new ReadOnlySpan<byte>(pixels, w * h * 4).ToArray();
-        this.width = width;
-        this.height = height;
+        Width = width;
+        Height = height;
 
         fontSize = io.Fonts.Fonts[0].FontSize;
         for (var f = 0; f < io.Fonts.Fonts.Size; f++)
@@ -81,6 +83,13 @@ public sealed class ImGuiHost : IDisposable
                 if (glyph.Visible != 0) glyphs[(glyph.U0, glyph.V0)] = (glyph.Codepoint, glyph.X0, glyph.AdvanceX);
             }
         }
+    }
+
+    public void Resize(int width, int height)
+    {
+        Width = width;
+        Height = height;
+        io.DisplaySize = new Vector2(width, height);
     }
 
     public void Step(int frames)
@@ -224,7 +233,7 @@ public sealed class ImGuiHost : IDisposable
         return hash;
     }
 
-    public byte[] Screenshot() => Rasterizer.Render(ImGui.GetDrawData(), atlas, atlasWidth, atlasHeight, width, height);
+    public byte[] Screenshot() => Rasterizer.Render(ImGui.GetDrawData(), atlas, atlasWidth, atlasHeight, Width, Height);
 
     public unsafe void Dispose()
     {
