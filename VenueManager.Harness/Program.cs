@@ -14,19 +14,27 @@ public static class Program
             return 1;
         }
 
-        var url = Environment.GetEnvironmentVariable("XVM_HARNESS_URL");
-        var secret = Environment.GetEnvironmentVariable("XVM_HARNESS_SECRET");
-        var config = Environment.GetEnvironmentVariable("XVM_HARNESS_CONFIG");
-        if (!string.IsNullOrEmpty(config) && (!string.IsNullOrEmpty(url) || !string.IsNullOrEmpty(secret)))
+        var store = SessionStore.Default();
+        var code = Environment.GetEnvironmentVariable("XVM_HARNESS_PAIRING_CODE");
+        if (!string.IsNullOrEmpty(code))
         {
-            Console.Error.WriteLine("XVM_HARNESS_CONFIG cannot be combined with XVM_HARNESS_URL or XVM_HARNESS_SECRET.");
-            return 1;
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            var result = XvmApiPairing.LinkAsync(http, XvmApiPairing.DevUrl, code).GetAwaiter().GetResult();
+            if (!result.Success || string.IsNullOrEmpty(result.Secret))
+            {
+                Console.Error.WriteLine($"link failed: {result.Message}");
+                return 1;
+            }
+
+            store.Save(result.Secret, result.PersonName);
         }
 
-        var options = new HarnessOptions(url, secret, string.IsNullOrEmpty(config) ? null : config);
+        var secret = store.LoadSecret();
+        if (secret is null)
+            Console.Error.WriteLine("Not linked. Generate a link code at https://dev.xivvenuemanager.com/dashboard/api-keys, then type: link <code>");
 
-        using var host = PluginHost.Start(options);
-        new Cli(host).Run(Console.In, Console.Out);
+        using var host = PluginHost.Start(secret is null ? new HarnessOptions() : new HarnessOptions(XvmApiPairing.DevUrl, secret));
+        new Cli(host, store).Run(Console.In, Console.Out);
         return 0;
     }
 }

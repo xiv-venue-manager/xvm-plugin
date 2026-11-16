@@ -5,12 +5,11 @@ using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
-using Newtonsoft.Json;
 using VenueManager.UI;
 
 namespace VenueManager.Harness;
 
-public sealed record HarnessOptions(string? ApiUrl = null, string? ApiSecret = null, string? ConfigPath = null);
+public sealed record HarnessOptions(string? ApiUrl = null, string? ApiSecret = null);
 
 public sealed class PluginHost : IDisposable
 {
@@ -43,12 +42,16 @@ public sealed class PluginHost : IDisposable
     private readonly Func<string, Dalamud.Interface.FontAwesomeIcon, bool> originalButtonWithId = IconFont.IconButtonWithId;
     private Window? open;
 
+    public string ApiUrl { get; }
+    public bool Linked => plugin.xivAppClient?.IsConfigured == true;
+    public bool LinkRejected => plugin.xivAppClient?.LinkRejected == true;
     public int Width { get; }
     public int Height { get; }
     public IReadOnlyList<string> Log => logLines;
 
-    private PluginHost(Configuration config, int width, int height)
+    private PluginHost(Configuration config, int width, int height, string apiUrl)
     {
+        ApiUrl = apiUrl;
         Width = width;
         Height = height;
         configDir = Path.Combine(Path.GetTempPath(), "vm-harness-" + Guid.NewGuid().ToString("N"));
@@ -86,19 +89,10 @@ public sealed class PluginHost : IDisposable
         if (!string.IsNullOrEmpty(options.ApiSecret) && string.IsNullOrWhiteSpace(options.ApiUrl))
             throw new ArgumentException("A secret needs an explicit ApiUrl, so the harness never contacts the production API by accident.", nameof(options));
 
-        if (!string.IsNullOrEmpty(options.ConfigPath))
-        {
-            if (!string.IsNullOrEmpty(options.ApiUrl) || !string.IsNullOrEmpty(options.ApiSecret))
-                throw new ArgumentException("ConfigPath cannot be combined with ApiUrl or ApiSecret.", nameof(options));
-            if (!File.Exists(options.ConfigPath))
-                throw new FileNotFoundException("Config file not found.", options.ConfigPath);
-        }
-
         var config = ConfigFor(options);
-        if (!string.IsNullOrEmpty(options.ConfigPath)) CheckApiUrl(config.xvmApiUrl);
-        else if (!string.IsNullOrEmpty(options.ApiUrl)) CheckApiUrl(options.ApiUrl);
+        if (!string.IsNullOrEmpty(options.ApiUrl)) CheckApiUrl(options.ApiUrl);
 
-        return new PluginHost(config, width, height);
+        return new PluginHost(config, width, height, string.IsNullOrWhiteSpace(options.ApiUrl) ? XvmApiPairing.DevUrl : options.ApiUrl);
     }
 
     public static void CheckApiUrl(string? url)
@@ -107,6 +101,24 @@ public sealed class PluginHost : IDisposable
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
             || !AllowedHosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase))
             throw new ArgumentException("The harness only talks to dev-api.xivvenuemanager.com, localhost or 127.0.0.1.");
+    }
+
+    public void ApplySession(string secret)
+    {
+        CheckApiUrl(ApiUrl);
+        plugin.Configuration.xvmApiUrl = ApiUrl;
+        plugin.Configuration.xvmApiSecret = secret;
+        plugin.xivAppClient!.ConfigureXvm(ApiUrl, secret);
+        _ = Task.Run(async () =>
+        {
+            try { await plugin.AutoLoadXivAppDataAsync(); } catch { }
+        });
+    }
+
+    public void ClearSession()
+    {
+        plugin.Configuration.xvmApiSecret = "";
+        plugin.xivAppClient?.ClearXvm();
     }
 
     public ImGuiHost Imgui => imgui;
@@ -209,18 +221,6 @@ public sealed class PluginHost : IDisposable
     private static Configuration ConfigFor(HarnessOptions options)
     {
         var version = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "";
-        if (!string.IsNullOrEmpty(options.ConfigPath))
-        {
-            var assembly = typeof(Plugin).Assembly.GetName().Name!;
-            var text = File.ReadAllText(options.ConfigPath).Replace("XIVVenueManagerSyncDev", assembly);
-            var loaded = JsonConvert.DeserializeObject<Configuration>(
-                text,
-                new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.Objects })
-                ?? throw new InvalidDataException("Config file did not contain a plugin configuration");
-            loaded.LastSeenVersion = version;
-            return loaded;
-        }
-
         var config = new Configuration { LastSeenVersion = version };
         if (!string.IsNullOrEmpty(options.ApiSecret))
         {

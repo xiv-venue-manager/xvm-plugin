@@ -3,8 +3,15 @@ namespace VenueManager.Harness;
 public sealed class Cli
 {
     private readonly PluginHost host;
+    private readonly SessionStore? store;
+    private readonly HttpMessageHandler? httpHandler;
 
-    public Cli(PluginHost host) => this.host = host;
+    public Cli(PluginHost host, SessionStore? store = null, HttpMessageHandler? httpHandler = null)
+    {
+        this.host = host;
+        this.store = store;
+        this.httpHandler = httpHandler;
+    }
 
     public void Run(TextReader input, TextWriter output)
     {
@@ -70,6 +77,16 @@ public sealed class Cli
             case "state":
                 output.WriteLine($"tab: {host.CurrentTab}");
                 output.WriteLine($"log lines: {host.Log.Count}");
+                output.WriteLine($"linked: {(host.Linked ? "yes" : "no")}");
+                output.WriteLine($"link rejected: {(host.LinkRejected ? "yes" : "no")}");
+                break;
+            case "link":
+                Link(rest, output);
+                break;
+            case "unlink":
+                store?.Delete();
+                host.ClearSession();
+                output.WriteLine("unlinked");
                 break;
             case "shot":
                 File.WriteAllBytes(rest, Png.Encode(host.Imgui.Screenshot(), host.Width, host.Height));
@@ -79,5 +96,20 @@ public sealed class Cli
                 output.WriteLine($"unknown command: {verb}");
                 break;
         }
+    }
+
+    private void Link(string code, TextWriter output)
+    {
+        using var http = new HttpClient(httpHandler ?? new HttpClientHandler(), httpHandler is null) { Timeout = TimeSpan.FromSeconds(15) };
+        var result = XvmApiPairing.LinkAsync(http, host.ApiUrl, code).GetAwaiter().GetResult();
+        if (!result.Success || string.IsNullOrEmpty(result.Secret))
+        {
+            output.WriteLine($"link failed: {result.Message}");
+            return;
+        }
+
+        store?.Save(result.Secret, result.PersonName);
+        host.ApplySession(result.Secret);
+        output.WriteLine($"linked as {result.PersonName ?? "unknown"}{(store is null ? " (not saved)" : "")}");
     }
 }

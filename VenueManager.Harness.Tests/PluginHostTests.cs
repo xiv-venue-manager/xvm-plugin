@@ -103,103 +103,32 @@ public class PluginHostTests
     }
 
     [Fact]
-    public void Loads_a_config_saved_by_the_dev_build()
-    {
-        var path = TempConfig("http://127.0.0.1:1", "XIVVenueManagerSyncDev");
-        try
-        {
-            using var host = PluginHost.Start(new HarnessOptions(ConfigPath: path));
-
-            Assert.Equal("abc", host.Configuration.selectedVenueId);
-        }
-        finally { File.Delete(path); }
-    }
-
-    private static string TempConfig(string url, string? assemblyName = null)
-    {
-        var path = Path.Combine(Path.GetTempPath(), "vm-harness-test-" + Guid.NewGuid().ToString("N") + ".json");
-        var assembly = assemblyName ?? typeof(VenueManager.Plugin).Assembly.GetName().Name;
-        File.WriteAllText(path, $$"""
-            {
-              "$type": "VenueManager.Configuration, {{assembly}}",
-              "xvmApiUrl": "{{url}}",
-              "xvmApiSecret": "fake-secret-for-test",
-              "selectedVenueId": "abc",
-              "syncToXivApp": true
-            }
-            """);
-        return path;
-    }
-
-    [Fact]
-    public void Loads_a_plugin_config_file()
-    {
-        var path = TempConfig("http://127.0.0.1:1");
-        try
-        {
-            using var host = PluginHost.Start(new HarnessOptions(ConfigPath: path));
-
-            Assert.Equal("http://127.0.0.1:1", host.Configuration.xvmApiUrl);
-            Assert.Equal("abc", host.Configuration.selectedVenueId);
-        }
-        finally { File.Delete(path); }
-    }
-
-    [Fact]
-    public void Never_writes_the_config_file()
-    {
-        var path = TempConfig("http://127.0.0.1:1");
-        try
-        {
-            var bytes = File.ReadAllBytes(path);
-            var stamp = File.GetLastWriteTimeUtc(path);
-
-            using (var host = PluginHost.Start(new HarnessOptions(ConfigPath: path)))
-            {
-                host.Open("Main");
-                host.Step(3);
-            }
-
-            Assert.Equal(bytes, File.ReadAllBytes(path));
-            Assert.Equal(stamp, File.GetLastWriteTimeUtc(path));
-        }
-        finally { File.Delete(path); }
-    }
-
-    [Fact]
-    public void A_production_url_in_the_config_is_refused_without_leaking_the_secret()
-    {
-        var path = TempConfig("https://api.xivvenuemanager.com");
-        try
-        {
-            var error = Assert.Throws<ArgumentException>(() => PluginHost.Start(new HarnessOptions(ConfigPath: path)));
-
-            Assert.DoesNotContain("fake-secret-for-test", error.Message);
-        }
-        finally { File.Delete(path); }
-    }
-
-    [Fact]
     public void A_production_url_in_the_options_is_refused()
     {
         Assert.Throws<ArgumentException>(() => PluginHost.Start(new HarnessOptions("https://api.xivvenuemanager.com", "x")));
     }
 
     [Fact]
-    public void A_config_path_with_a_secret_is_refused()
+    public void ApplySession_links_the_plugin_and_ClearSession_unlinks_it()
     {
-        var path = TempConfig("http://127.0.0.1:1");
-        try
-        {
-            Assert.Throws<ArgumentException>(() => PluginHost.Start(new HarnessOptions(ApiSecret: "x", ConfigPath: path)));
-        }
-        finally { File.Delete(path); }
+        using var host = PluginHost.Start(new HarnessOptions("http://127.0.0.1:1"));
+        Assert.False(host.Linked);
+
+        host.ApplySession("test-secret");
+        Assert.True(host.Linked);
+        Assert.Equal("test-secret", host.Configuration.xvmApiSecret);
+
+        host.ClearSession();
+        Assert.False(host.Linked);
+        Assert.True(string.IsNullOrEmpty(host.Configuration.xvmApiSecret));
     }
 
     [Fact]
-    public void A_missing_config_file_throws()
+    public void ApiUrl_defaults_to_the_dev_api()
     {
-        Assert.Throws<FileNotFoundException>(() => PluginHost.Start(new HarnessOptions(ConfigPath: "/nonexistent/vm-harness.json")));
+        using var host = PluginHost.Start(new HarnessOptions());
+
+        Assert.Equal(VenueManager.XvmApiPairing.DevUrl, host.ApiUrl);
     }
 
     [Theory]

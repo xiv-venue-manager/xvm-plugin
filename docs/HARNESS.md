@@ -32,29 +32,27 @@ printf 'open Main\ntabs\ntree\nquit\n' | dotnet run --project VenueManager.Harne
 | `wait [SECONDS]` | Sleeps real time (default 2, max 60), then draws two frames, so network data can arrive |
 | `step [N]` | Draws N more frames |
 | `shot PATH` | Writes a PNG screenshot |
-| `state` | Prints the selected tab and the number of logged errors and warnings |
+| `link CODE` | Exchanges a dev pairing code for a session, saves it and links the plugin |
+| `unlink` | Deletes the saved session and unlinks the plugin |
+| `state` | Prints the selected tab, the number of logged errors and warnings, `linked: yes\|no` and `link rejected: yes\|no` |
 | `quit` | Stops |
 
 Do not `tap` buttons that open links ("Open xivvenuemanager.com"): the plugin opens them in your browser.
 
-## Linked account
+## Linking to the dev API
 
-With no account linked, the main window always shows Settings. To see the other tabs, give the harness an API to talk to:
+With no account linked, the main window always shows Settings. To see the other tabs, link the harness to your dev account with a pairing code:
 
-```bash
-XVM_HARNESS_URL=http://127.0.0.1:8000 XVM_HARNESS_SECRET=<pairing secret> \
-  dotnet run --project VenueManager.Harness
-```
-
-A secret needs an explicit URL, so the harness never contacts the production API by accident. Use a local or dev xvm-api. The plugin's own settings and venue data are never read or written: the harness uses a temporary folder.
-
-## Using your dev plugin config
+1. Generate a code on the dev dashboard API Keys page: https://dev.xivvenuemanager.com/dashboard/api-keys
+2. Run once with the code in the environment, or start the harness and type `link <code>`:
 
 ```bash
-XVM_HARNESS_CONFIG=~/.xlcore/pluginConfigs/XIVVenueManagerSyncDev.json dotnet run --project VenueManager.Harness
+XVM_HARNESS_PAIRING_CODE=<code> dotnet run --project VenueManager.Harness
 ```
 
-The file is only read: nothing is written back. The harness can only talk to the dev API (`dev-api.xivvenuemanager.com`) or a loopback address, with no override; any other URL, including production, is refused. Reads are harmless, but taps like Claim or Clock in write to whatever API the config points at. Use `wait` after `open` or `tab` to let the background fetches finish before `tree`. `XVM_HARNESS_CONFIG` cannot be combined with `XVM_HARNESS_URL` or `XVM_HARNESS_SECRET`.
+The session is stored in `~/.cache/xvm-harness/dev-session.json` (or under `$XDG_CACHE_HOME`), readable by your user only, and reused on the next start. `unlink` deletes it. If `state` shows `link rejected: yes` or the API answers 401, generate a new code and link again.
+
+The harness only talks to `dev-api.xivvenuemanager.com`, with no override. Reads are harmless, but taps like Claim or Clock in write to your own dev data. The secret and the code are never printed. The plugin's own settings are never read or written: the harness uses a temporary folder. Use `wait` after `open` or `tab` to let the background fetches finish before `tree`.
 
 Known limits: some saves and the doorbell fail on Linux and are logged (see `state`); two text items on one line read back as one.
 

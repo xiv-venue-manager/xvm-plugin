@@ -1,3 +1,5 @@
+using System.Net;
+using System.Text;
 using VenueManager.Harness;
 using Xunit;
 
@@ -97,5 +99,102 @@ public class CliTests
     {
         Assert.Equal(60, Cli.ClampWait(9999));
         Assert.Equal(0, Cli.ClampWait(-5));
+    }
+
+    private sealed class FakeHandler : HttpMessageHandler
+    {
+        private readonly bool succeed;
+        public FakeHandler(bool succeed) => this.succeed = succeed;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            var (status, json) = !succeed ? (HttpStatusCode.BadRequest, "{}")
+                : path == "/pairing/exchange" ? (HttpStatusCode.Created, "{\"secret\":\"s3cret-value\"}")
+                : path == "/me" ? (HttpStatusCode.OK, "{\"person\":{\"display_name\":\"Ehno\"}}")
+                : (HttpStatusCode.NotFound, "{}");
+            return Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(json, Encoding.UTF8, "application/json") });
+        }
+    }
+
+    private static string TempStorePath() => Path.Combine(Path.GetTempPath(), "vm-cli-" + Guid.NewGuid().ToString("N"), "s.json");
+
+    private static string RunWith(PluginHost host, SessionStore? store, bool succeed, string script)
+    {
+        var output = new StringWriter();
+        new Cli(host, store, new FakeHandler(succeed)).Run(new StringReader(script), output);
+        return output.ToString();
+    }
+
+    [Fact]
+    public void Link_saves_the_session_and_never_prints_the_secret_or_code()
+    {
+        var path = TempStorePath();
+        try
+        {
+            using var host = PluginHost.Start(new HarnessOptions("http://127.0.0.1:1"));
+            var store = new SessionStore(path);
+
+            var output = RunWith(host, store, true, "link ABCD-1234\nquit\n");
+
+            Assert.Contains("linked as Ehno", output);
+            Assert.DoesNotContain("s3cret-value", output);
+            Assert.DoesNotContain("ABCD-1234", output);
+            Assert.True(host.Linked);
+            Assert.Equal("s3cret-value", store.LoadSecret());
+        }
+        finally { try { Directory.Delete(Path.GetDirectoryName(path)!, true); } catch { } }
+    }
+
+    [Fact]
+    public void Link_without_a_store_says_not_saved()
+    {
+        using var host = PluginHost.Start(new HarnessOptions("http://127.0.0.1:1"));
+
+        var output = RunWith(host, null, true, "link ABCD-1234\nquit\n");
+
+        Assert.Contains("linked as Ehno (not saved)", output);
+        Assert.True(host.Linked);
+    }
+
+    [Fact]
+    public void A_failed_link_prints_the_reason_and_saves_nothing()
+    {
+        var path = TempStorePath();
+        using var host = PluginHost.Start(new HarnessOptions("http://127.0.0.1:1"));
+
+        var output = RunWith(host, new SessionStore(path), false, "link ABCD-1234\nquit\n");
+
+        Assert.Contains("link failed: ", output);
+        Assert.DoesNotContain("ABCD-1234", output);
+        Assert.False(File.Exists(path));
+        Assert.False(host.Linked);
+    }
+
+    [Fact]
+    public void Unlink_deletes_the_session_and_unlinks_the_host()
+    {
+        var path = TempStorePath();
+        try
+        {
+            using var host = PluginHost.Start(new HarnessOptions("http://127.0.0.1:1"));
+            var store = new SessionStore(path);
+
+            var output = RunWith(host, store, true, "link ABCD-1234\nunlink\nquit\n");
+
+            Assert.Contains("unlinked", output);
+            Assert.False(File.Exists(path));
+            Assert.False(host.Linked);
+        }
+        finally { try { Directory.Delete(Path.GetDirectoryName(path)!, true); } catch { } }
+    }
+
+    [Fact]
+    public void State_shows_the_link_status()
+    {
+        var output = Run("state\nquit\n");
+
+        Assert.Contains("linked: no", output);
+        Assert.Contains("link rejected: no", output);
     }
 }
