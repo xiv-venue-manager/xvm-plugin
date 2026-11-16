@@ -195,6 +195,35 @@ public sealed class ImGuiHost : IDisposable
         return runs;
     }
 
+    public unsafe ulong DrawDataHash()
+    {
+        var data = ImGui.GetDrawData();
+        if (data.IsNull) return 0;
+
+        var hash = 14695981039346656037UL;
+        void Mix(ReadOnlySpan<byte> bytes)
+        {
+            foreach (var b in bytes) hash = (hash ^ b) * 1099511628211UL;
+        }
+
+        for (var l = 0; l < data.CmdListsCount; l++)
+        {
+            var list = new ImDrawListPtr(data.CmdLists[l]);
+            Mix(new ReadOnlySpan<byte>(list.VtxBuffer.Data, list.VtxBuffer.Size * sizeof(ImDrawVert)));
+            Mix(new ReadOnlySpan<byte>(list.IdxBuffer.Data, list.IdxBuffer.Size * sizeof(ushort)));
+            for (var c = 0; c < list.CmdBuffer.Size; c++)
+            {
+                var clip = list.CmdBuffer.Data[c].ClipRect;
+                Mix(BitConverter.GetBytes(clip.X));
+                Mix(BitConverter.GetBytes(clip.Y));
+                Mix(BitConverter.GetBytes(clip.Z));
+                Mix(BitConverter.GetBytes(clip.W));
+            }
+        }
+
+        return hash;
+    }
+
     public byte[] Screenshot() => Rasterizer.Render(ImGui.GetDrawData(), atlas, atlasWidth, atlasHeight, width, height);
 
     public unsafe void Dispose()

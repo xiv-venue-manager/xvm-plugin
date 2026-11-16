@@ -288,4 +288,48 @@ public class ImGuiHostTests
 
         Assert.True(scroll > 0);
     }
+
+    [Fact]
+    public void DrawDataHash_is_zero_before_any_frame()
+    {
+        using var host = new ImGuiHost(400, 300) { Draw = DrawSpike };
+
+        Assert.Equal(0UL, host.DrawDataHash());
+    }
+
+    [Fact]
+    public void DrawDataHash_is_stable_for_an_unchanged_frame()
+    {
+        using var host = new ImGuiHost(400, 300) { Draw = DrawSpike };
+
+        host.Step(3);
+        var first = host.DrawDataHash();
+        host.Step(1);
+
+        Assert.NotEqual(0UL, first);
+        Assert.Equal(first, host.DrawDataHash());
+    }
+
+    [Fact]
+    public void DrawDataHash_changes_when_the_drawn_text_changes()
+    {
+        var label = "Hello harness";
+        using var host = new ImGuiHost(400, 300)
+        {
+            Draw = () =>
+            {
+                ImGui.SetNextWindowPos(new Vector2(10, 10));
+                ImGui.Begin("Spike");
+                ImGui.Text(label);
+                ImGui.End();
+            },
+        };
+
+        host.Step(3);
+        var before = host.DrawDataHash();
+        label = "Goodbye harness";
+        host.Step(1);
+
+        Assert.NotEqual(before, host.DrawDataHash());
+    }
 }
