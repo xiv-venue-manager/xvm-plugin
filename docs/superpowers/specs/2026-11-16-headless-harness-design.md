@@ -103,7 +103,7 @@ Driver verb, then host injects input and steps N frames (`Framework.Update` rais
 
 ## Error handling
 
-Fake members the plugin calls but we did not implement throw `NotImplementedException` naming the member. This is deliberate: a silent default would hide a missing fake. `NAudio` doorbell loading already runs in a try block, so audio failing on Linux only logs a warning.
+Fakes are lenient: a member nobody overrode returns a default (empty string, completed task, a nested fake for an interface, zero for a value type) and every call is counted in `Fake.Calls`. The plugin's constructor needs defaults for members that have no meaningful answer, so throwing on unimplemented members is not workable. Tests assert on the call log where it matters. `NAudio` doorbell loading and Dalamud's safe file write fail on Linux; the plugin catches and logs both.
 
 ## Testing
 
