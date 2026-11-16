@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net10.0-windows7.0</TargetFramework>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -12,8 +13,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="Dalamud.Bindings.ImGui">
-      <HintPath>$(DalamudDir)/Dalamud.Bindings.ImGui.dll</HintPath>
+    <DalamudDlls Include="$(DalamudDir)/Dalamud.dll;$(DalamudDir)/Dalamud.Bindings.ImGui.dll;$(DalamudDir)/FFXIVClientStructs.dll;$(DalamudDir)/Lumina.dll;$(DalamudDir)/Lumina.Excel.dll;$(DalamudDir)/InteropGenerator.Runtime.dll;$(DalamudDir)/Newtonsoft.Json.dll;$(DalamudDir)/Serilog.dll;$(DalamudDir)/HexaGen.Runtime.dll" />
+    <Reference Include="@(DalamudDlls)">
       <Private>true</Private>
     </Reference>
   </ItemGroup>

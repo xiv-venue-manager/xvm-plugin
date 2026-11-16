@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <Import Project="Harness.props" />
   <PropertyGroup>
+    <OutputType>Exe</OutputType>
     <RootNamespace>VenueManager.Harness</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\VenueManager\VenueManager.csproj" />
+  </ItemGroup>
 </Project>
