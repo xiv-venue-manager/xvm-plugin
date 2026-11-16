@@ -13,12 +13,20 @@ public sealed class ImGuiHost : IDisposable
     private readonly byte[] atlas;
     private readonly int atlasWidth;
     private readonly int atlasHeight;
-    private readonly int width;
-    private readonly int height;
     private readonly unsafe ushort* iconRanges;
     private readonly unsafe ushort* textRanges;
 
     private const float TextFontSize = 17f;
+
+    static ImGuiHost()
+    {
+        NativeLibrary.SetDllImportResolver(typeof(ImGui).Assembly, (name, _, _) =>
+            name == "cimgui" ? NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, "cimgui.dll")) : IntPtr.Zero);
+    }
+
+    public int Width { get; private set; }
+
+    public int Height { get; private set; }
 
     public bool HasIconFont { get; }
 
@@ -32,7 +40,6 @@ public sealed class ImGuiHost : IDisposable
         io = ImGui.GetIO();
         io.IniFilename = null;
         io.DisplaySize = new Vector2(width, height);
-        io.DeltaTime = 1f / 60f;
 
         if (textFontPath is not null && File.Exists(textFontPath))
         {
@@ -62,8 +69,8 @@ public sealed class ImGuiHost : IDisposable
         atlasWidth = w;
         atlasHeight = h;
         atlas = new ReadOnlySpan<byte>(pixels, w * h * 4).ToArray();
-        this.width = width;
-        this.height = height;
+        Width = width;
+        Height = height;
 
         fontSize = io.Fonts.Fonts[0].FontSize;
         for (var f = 0; f < io.Fonts.Fonts.Size; f++)
@@ -77,8 +84,18 @@ public sealed class ImGuiHost : IDisposable
         }
     }
 
-    public void Step(int frames)
+    public void Resize(int width, int height)
     {
+        Width = width;
+        Height = height;
+        io.DisplaySize = new Vector2(width, height);
+    }
+
+    public void Step(int frames) => Step(frames, 1f / 60f);
+
+    public void Step(int frames, float deltaSeconds)
+    {
+        io.DeltaTime = Math.Clamp(deltaSeconds, 1f / 240f, 0.1f);
         for (var i = 0; i < frames; i++)
         {
             ImGui.NewFrame();
@@ -87,13 +104,26 @@ public sealed class ImGuiHost : IDisposable
         }
     }
 
+    public void MouseMove(float x, float y) => io.AddMousePosEvent(x, y);
+
+    public void MouseButton(int button, bool down) => io.AddMouseButtonEvent(button, down);
+
+    public void MouseWheel(float x, float y) => io.AddMouseWheelEvent(x, y);
+
+    public void Key(ImGuiKey key, bool down) => io.AddKeyEvent(key, down);
+
+    public void Char(uint codepoint)
+    {
+        foreach (var unit in char.ConvertFromUtf32((int)codepoint)) io.AddInputCharacter(unit);
+    }
+
     public void Tap(float x, float y)
     {
-        io.AddMousePosEvent(x, y);
+        MouseMove(x, y);
         Step(2);
-        io.AddMouseButtonEvent(0, true);
+        MouseButton(0, true);
         Step(1);
-        io.AddMouseButtonEvent(0, false);
+        MouseButton(0, false);
         Step(2);
     }
 
@@ -176,7 +206,36 @@ public sealed class ImGuiHost : IDisposable
         return runs;
     }
 
-    public byte[] Screenshot() => Rasterizer.Render(ImGui.GetDrawData(), atlas, atlasWidth, atlasHeight, width, height);
+    public unsafe ulong DrawDataHash()
+    {
+        var data = ImGui.GetDrawData();
+        if (data.IsNull) return 0;
+
+        var hash = 14695981039346656037UL;
+        void Mix(ReadOnlySpan<byte> bytes)
+        {
+            foreach (var b in bytes) hash = (hash ^ b) * 1099511628211UL;
+        }
+
+        for (var l = 0; l < data.CmdListsCount; l++)
+        {
+            var list = new ImDrawListPtr(data.CmdLists[l]);
+            Mix(new ReadOnlySpan<byte>(list.VtxBuffer.Data, list.VtxBuffer.Size * sizeof(ImDrawVert)));
+            Mix(new ReadOnlySpan<byte>(list.IdxBuffer.Data, list.IdxBuffer.Size * sizeof(ushort)));
+            for (var c = 0; c < list.CmdBuffer.Size; c++)
+            {
+                var clip = list.CmdBuffer.Data[c].ClipRect;
+                Mix(BitConverter.GetBytes(clip.X));
+                Mix(BitConverter.GetBytes(clip.Y));
+                Mix(BitConverter.GetBytes(clip.Z));
+                Mix(BitConverter.GetBytes(clip.W));
+            }
+        }
+
+        return hash;
+    }
+
+    public byte[] Screenshot() => Rasterizer.Render(ImGui.GetDrawData(), atlas, atlasWidth, atlasHeight, Width, Height);
 
     public unsafe void Dispose()
     {

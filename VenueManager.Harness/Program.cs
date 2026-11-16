@@ -4,6 +4,11 @@ public static class Program
 {
     public static int Main(string[] args)
     {
+        string? shotPath = null;
+        var shotIndex = Array.IndexOf(args, "--window-shot");
+        if (shotIndex >= 0 && shotIndex + 1 < args.Length) shotPath = args[shotIndex + 1];
+        var windowMode = shotPath is not null || args.Contains("window") || args.Contains("--window");
+
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var problem = Preflight.Check(
             Environment.GetEnvironmentVariable("DALAMUD_HOME") ?? Path.Combine(home, ".xlcore/dalamud/Hooks/dev"),
@@ -34,6 +39,8 @@ public static class Program
             Console.Error.WriteLine("Not linked. Generate a link code at https://dev.xivvenuemanager.com/dashboard/api-keys, then type: link <code>");
 
         using var host = PluginHost.Start(secret is null ? new HarnessOptions() : new HarnessOptions(XvmApiPairing.DevUrl, secret));
+        if (windowMode) return WindowViewer.Run(host, shotPath);
+
         new Cli(host, store).Run(Console.In, Console.Out);
         return 0;
     }
