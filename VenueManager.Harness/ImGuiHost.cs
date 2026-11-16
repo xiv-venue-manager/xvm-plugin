@@ -67,6 +67,7 @@ public sealed class ImGuiHost : IDisposable
     {
         var runs = new List<TextRun>();
         var data = ImGui.GetDrawData();
+        if (data.IsNull) return runs;
 
         for (var l = 0; l < data.CmdListsCount; l++)
         {
@@ -85,7 +86,7 @@ public sealed class ImGuiHost : IDisposable
                 open = false;
             }
 
-            for (var i = 0; i + 5 < indices.Size; i += 6)
+            for (var i = 0; i + 5 < indices.Size;)
             {
                 var a = vertices.Data[indices.Data[i]];
                 var c = vertices.Data[indices.Data[i + 2]];
@@ -93,6 +94,7 @@ public sealed class ImGuiHost : IDisposable
                 if (!glyphs.TryGetValue(uv, out var glyph))
                 {
                     Flush();
+                    i += 3;
                     continue;
                 }
 
@@ -122,6 +124,7 @@ public sealed class ImGuiHost : IDisposable
                 penEnd = left - glyph.X0 + glyph.Advance;
                 lastLeft = left;
                 lastBottom = bottom;
+                i += 6;
             }
 
             Flush();

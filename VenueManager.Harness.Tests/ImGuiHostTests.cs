@@ -91,4 +91,34 @@ public class ImGuiHostTests
 
         Assert.Equal(0, claims);
     }
+
+    [Fact]
+    public void ReadText_keeps_reading_after_a_shape_with_an_odd_index_count()
+    {
+        using var host = new ImGuiHost(400, 300)
+        {
+            Draw = () =>
+            {
+                ImGui.SetNextWindowPos(new Vector2(10, 10));
+                ImGui.Begin("Odd");
+                ImGui.CollapsingHeader("Header");
+                ImGui.Text("After the arrow");
+                ImGui.End();
+            }
+        };
+        host.Step(3);
+
+        var texts = host.ReadText().Select(r => r.Text).ToList();
+
+        Assert.Contains("Header", texts);
+        Assert.Contains("After the arrow", texts);
+    }
+
+    [Fact]
+    public void ReadText_is_empty_before_any_frame_has_been_drawn()
+    {
+        using var host = new ImGuiHost(400, 300) { Draw = DrawSpike };
+
+        Assert.Empty(host.ReadText());
+    }
 }
