@@ -65,20 +65,7 @@ public class ShiftsTab : ITab
       return;
     }
 
-    // --- Open shifts available to claim ---
-    if (visibleOpenShifts.Count > 0)
-    {
-      ImGui.Spacing();
-      ThemeManager.SectionHeader("OPEN SHIFTS", ColorOpen);
-      DateTime? lastOpenShiftDate = null;
-      foreach (var shift in visibleOpenShifts)
-      {
-        DrawDateBreak(ref lastOpenShiftDate, shift.ScheduledStart);
-        drawOpenShiftRow(shift);
-      }
-    }
-
-    // Render shifts grouped: active first, then upcoming, then completed
+    // Render shifts grouped: active first, then upcoming, then open to claim, then completed
     bool anyActive = false;
     bool anyUpcoming = false;
     bool anyCompleted = false;
@@ -112,6 +99,18 @@ public class ShiftsTab : ITab
       {
         DrawDateBreak(ref lastUpcomingDate, shift.ScheduledStart);
         drawShiftRow(shift);
+      }
+    }
+
+    if (visibleOpenShifts.Count > 0)
+    {
+      ImGui.Spacing();
+      ThemeManager.SectionHeader("OPEN SHIFTS", ColorOpen);
+      DateTime? lastOpenShiftDate = null;
+      foreach (var shift in visibleOpenShifts)
+      {
+        DrawDateBreak(ref lastOpenShiftDate, shift.ScheduledStart);
+        drawOpenShiftRow(shift);
       }
     }
 
