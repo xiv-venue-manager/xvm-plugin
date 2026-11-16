@@ -22,6 +22,19 @@ public class PluginHostTests
     }
 
     [Fact]
+    public void Draws_real_icons_not_question_marks()
+    {
+        using var host = PluginHost.Start(new HarnessOptions());
+
+        host.Open("Main");
+        host.Step(4);
+
+        var tree = host.Tree();
+        Assert.Contains(tree, line => line.Contains("[Cog]"));
+        Assert.DoesNotContain(tree, line => line.EndsWith(") ?"));
+    }
+
+    [Fact]
     public void Lists_the_plugin_tabs()
     {
         using var host = PluginHost.Start(new HarnessOptions());

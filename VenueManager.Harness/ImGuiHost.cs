@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Text;
 using Dalamud.Bindings.ImGui;
 
@@ -14,16 +15,32 @@ public sealed class ImGuiHost : IDisposable
     private readonly int atlasHeight;
     private readonly int width;
     private readonly int height;
+    private readonly unsafe ushort* iconRanges;
+
+    public bool HasIconFont { get; }
+
+    public ImFontPtr IconFontHandle { get; }
 
     public Action Draw { get; set; } = () => { };
 
-    public unsafe ImGuiHost(int width, int height)
+    public unsafe ImGuiHost(int width, int height, string? iconFontPath = null)
     {
         ImGui.CreateContext();
         io = ImGui.GetIO();
         io.IniFilename = null;
         io.DisplaySize = new Vector2(width, height);
         io.DeltaTime = 1f / 60f;
+
+        io.Fonts.AddFontDefault();
+        if (iconFontPath is not null && File.Exists(iconFontPath))
+        {
+            iconRanges = (ushort*)NativeMemory.Alloc(3 * sizeof(ushort));
+            iconRanges[0] = 0xF000;
+            iconRanges[1] = 0xF8FF;
+            iconRanges[2] = 0;
+            IconFontHandle = io.Fonts.AddFontFromFileTTF(iconFontPath, 14f, ImFontConfigPtr.Null, iconRanges);
+            HasIconFont = true;
+        }
 
         byte* pixels;
         int w, h;
@@ -34,13 +51,15 @@ public sealed class ImGuiHost : IDisposable
         this.width = width;
         this.height = height;
 
-        var font = io.Fonts.Fonts[0];
-        fontSize = font.FontSize;
-        var table = font.Glyphs;
-        for (var i = 0; i < table.Size; i++)
+        fontSize = io.Fonts.Fonts[0].FontSize;
+        for (var f = 0; f < io.Fonts.Fonts.Size; f++)
         {
-            var glyph = table.Data[i];
-            if (glyph.Visible != 0) glyphs[(glyph.U0, glyph.V0)] = (glyph.Codepoint, glyph.X0, glyph.AdvanceX);
+            var table = io.Fonts.Fonts[f].Glyphs;
+            for (var i = 0; i < table.Size; i++)
+            {
+                var glyph = table.Data[i];
+                if (glyph.Visible != 0) glyphs[(glyph.U0, glyph.V0)] = (glyph.Codepoint, glyph.X0, glyph.AdvanceX);
+            }
         }
     }
 
@@ -145,5 +164,9 @@ public sealed class ImGuiHost : IDisposable
 
     public byte[] Screenshot() => Rasterizer.Render(ImGui.GetDrawData(), atlas, atlasWidth, atlasHeight, width, height);
 
-    public void Dispose() => ImGui.DestroyContext();
+    public unsafe void Dispose()
+    {
+        ImGui.DestroyContext();
+        NativeMemory.Free(iconRanges);
+    }
 }

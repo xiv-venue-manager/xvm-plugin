@@ -121,4 +121,28 @@ public class ImGuiHostTests
 
         Assert.Empty(host.ReadText());
     }
+
+    private static string FontPath => Path.Combine(
+        Environment.GetEnvironmentVariable("AETHERPHONE_HARNESS_CACHE") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".aetherphone-harness"),
+        "assets", "UIRes", "FontAwesomeFreeSolid.otf");
+
+    [Fact]
+    public void ReadText_reads_icon_font_glyphs_as_private_use_characters()
+    {
+        using var host = new ImGuiHost(400, 300, FontPath);
+        host.Draw = () =>
+        {
+            ImGui.SetNextWindowPos(new Vector2(10, 10));
+            ImGui.Begin("Icons");
+            ImGui.PushFont(host.IconFontHandle);
+            ImGui.Text("\uF013");
+            ImGui.PopFont();
+            ImGui.End();
+        };
+        Assert.True(host.HasIconFont);
+
+        host.Step(3);
+
+        Assert.Contains(host.ReadText(), r => r.Text == "\uF013");
+    }
 }

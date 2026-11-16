@@ -70,11 +70,10 @@ public sealed class PluginHost : IDisposable
                 .SetValue(null, Fake.Make(service));
         }
 
-        IconFont.Font = () => ImGui.GetFont();
-        IconFont.IconButton = icon => ImGui.Button($"[{icon}]##{icon}");
-        IconFont.IconButtonWithId = (id, icon) => ImGui.Button($"[{icon}]{id}");
-
-        imgui = new ImGuiHost(width, height);
+        imgui = new ImGuiHost(width, height, IconFontPath());
+        IconFont.Font = () => imgui.HasIconFont ? imgui.IconFontHandle : ImGui.GetFont();
+        IconFont.IconButton = icon => IconButton(icon, $"##{icon}");
+        IconFont.IconButtonWithId = (id, icon) => IconButton(icon, id);
         plugin = new Plugin();
         imgui.Draw = DrawOpenWindow;
     }
@@ -108,8 +107,32 @@ public sealed class PluginHost : IDisposable
     public IReadOnlyList<string> Tree() => imgui.ReadText()
         .OrderBy(r => (int)r.Y)
         .ThenBy(r => r.X)
-        .Select(r => $"({r.X:0},{r.Y:0}) {r.Text}")
+        .Select(r => $"({r.X:0},{r.Y:0}) {IconNames(r.Text)}")
         .ToList();
+
+    private static string IconNames(string text) => string.Concat(text.Select(c =>
+    {
+        if (c < 0xF000 || c > 0xF8FF) return c.ToString();
+        var name = ((Dalamud.Interface.FontAwesomeIcon)c).ToString();
+        return char.IsDigit(name[0]) ? $"[U+{(int)c:X4}]" : $"[{name}]";
+    }));
+
+    private static string? IconFontPath()
+    {
+        var root = Environment.GetEnvironmentVariable("AETHERPHONE_HARNESS_CACHE");
+        if (string.IsNullOrEmpty(root)) root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".aetherphone-harness");
+        return Path.Combine(root, "assets", "UIRes", "FontAwesomeFreeSolid.otf");
+    }
+
+    private bool IconButton(Dalamud.Interface.FontAwesomeIcon icon, string id)
+    {
+        if (!imgui.HasIconFont) return ImGui.Button($"[{icon}]{id}");
+
+        ImGui.PushFont(imgui.IconFontHandle);
+        var clicked = ImGui.Button($"{Dalamud.Interface.FontAwesomeExtensions.ToIconString(icon)}{id}");
+        ImGui.PopFont();
+        return clicked;
+    }
 
     public bool Tap(string text) => imgui.TapText(text);
 
