@@ -17,6 +17,7 @@ public class InventoryTab : ITab
   public string Tooltip => "Inventory";
   public bool IsVisible => plugin.xivAppInventoryEnabled;
 
+  private string serviceFilter = "";
   private string searchQuery = "";
   private List<ItemSearchResult> searchResults = new();
   private string? linkingServiceId = null;
@@ -39,7 +40,16 @@ public class InventoryTab : ITab
       return;
     }
 
-    foreach (var service in plugin.availableServices)
+    ImGui.SetNextItemWidth(-1);
+    ImGui.InputTextWithHint("##servicefilter", "Filter by service, item or category", ref serviceFilter, 64);
+
+    var shown = ServiceFilter.Apply(plugin.availableServices, serviceFilter);
+    if (shown.Count == 0 && serviceFilter.Trim().Length > 0)
+    {
+      ImGui.TextColored(Colors.XivSubtext0, "No services match.");
+    }
+
+    foreach (var service in shown)
     {
       drawServiceRow(service);
     }

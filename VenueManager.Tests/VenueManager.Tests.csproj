@@ -22,6 +22,7 @@
     <Compile Include="..\VenueManager\XvmApiWrites.cs" Link="XvmApiWrites.cs" />
     <Compile Include="..\VenueManager\VenueAddressMatcher.cs" Link="VenueAddressMatcher.cs" />
     <Compile Include="..\VenueManager\ShiftPromptPlanner.cs" Link="ShiftPromptPlanner.cs" />
+    <Compile Include="..\VenueManager\ServiceFilter.cs" Link="ServiceFilter.cs" />
     <Compile Include="..\VenueManager\ShiftLabelPicker.cs" Link="ShiftLabelPicker.cs" />
     <Compile Include="..\VenueManager\ShiftDates.cs" Link="ShiftDates.cs" />
     <Compile Include="..\VenueManager\OpenShiftBoard.cs" Link="OpenShiftBoard.cs" />
