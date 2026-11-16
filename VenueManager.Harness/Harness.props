@@ -1,0 +1,25 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows7.0</TargetFramework>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+    <DalamudDir Condition="'$(DALAMUD_HOME)' != ''">$(DALAMUD_HOME)</DalamudDir>
+    <DalamudDir Condition="'$(DalamudDir)' == ''">$(HOME)/.xlcore/dalamud/Hooks/dev</DalamudDir>
+    <HarnessCache Condition="'$(AETHERPHONE_HARNESS_CACHE)' != ''">$(AETHERPHONE_HARNESS_CACHE)</HarnessCache>
+    <HarnessCache Condition="'$(HarnessCache)' == ''">$(HOME)/.aetherphone-harness</HarnessCache>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <DalamudDlls Include="$(DalamudDir)/Dalamud.dll;$(DalamudDir)/Dalamud.Bindings.ImGui.dll;$(DalamudDir)/FFXIVClientStructs.dll;$(DalamudDir)/Lumina.dll;$(DalamudDir)/Lumina.Excel.dll;$(DalamudDir)/InteropGenerator.Runtime.dll;$(DalamudDir)/Newtonsoft.Json.dll;$(DalamudDir)/Serilog.dll;$(DalamudDir)/HexaGen.Runtime.dll" />
+    <Reference Include="@(DalamudDlls)">
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="StageCimgui" AfterTargets="Build">
+    <Copy SourceFiles="$(HarnessCache)/native/libcimgui.so" DestinationFiles="$(OutDir)cimgui.dll" Condition="Exists('$(HarnessCache)/native/libcimgui.so')" />
+  </Target>
+</Project>
