@@ -33,7 +33,8 @@ namespace VenueManager
     [property: JsonPropertyName("id")] int Id,
     [property: JsonPropertyName("starts_at")] string StartsAt,
     [property: JsonPropertyName("ends_at")] string EndsAt,
-    [property: JsonPropertyName("position_name")] string PositionName);
+    [property: JsonPropertyName("position_name")] string PositionName,
+    [property: JsonPropertyName("event_title")] string? EventTitle = null);
 
   internal sealed record XvmPosition(
     [property: JsonPropertyName("id")] int Id,

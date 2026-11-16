@@ -43,6 +43,7 @@ namespace VenueManager
           ScheduledStart = s.StartsAt,
           ScheduledEnd = s.EndsAt,
           RoleName = s.PositionName,
+          EventTitle = s.EventTitle,
         }).ToList(),
       };
 

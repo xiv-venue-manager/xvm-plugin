@@ -49,12 +49,13 @@ public class XvmApiReadsTests
     {
         var handler = new RoutedHandler()
             .On("/venues/v1/shifts?from=2026-10-09T12%3A00%3A00Z&to=2026-10-24T12%3A00%3A00Z&mine=true", "[{\"id\":7,\"position_id\":null,\"scheduled_start\":\"2026-10-10T19:00:00Z\",\"scheduled_end\":\"2026-10-10T23:00:00Z\",\"actual_start\":null,\"actual_end\":null,\"notes\":null,\"status\":\"scheduled\"}]")
-            .On("/venues/v1/event-shifts?from=2026-10-09T12%3A00%3A00Z&to=2026-10-24T12%3A00%3A00Z&open_only=true", "[{\"id\":20,\"starts_at\":\"2026-10-11T19:00:00Z\",\"ends_at\":\"2026-10-11T23:00:00Z\",\"position_name\":\"Shout runner\",\"capacity\":2,\"taken\":0,\"pending\":0}]");
+            .On("/venues/v1/event-shifts?from=2026-10-09T12%3A00%3A00Z&to=2026-10-24T12%3A00%3A00Z&open_only=true", "[{\"id\":20,\"event_title\":\"Test Plugin Dividers\",\"starts_at\":\"2026-10-11T19:00:00Z\",\"ends_at\":\"2026-10-11T23:00:00Z\",\"position_name\":\"Shout runner\",\"capacity\":2,\"taken\":0,\"pending\":0}]");
 
         var shifts = await Reads(handler).GetShiftsAsync("v1", Now);
 
         Assert.Equal("SCHEDULED", shifts.Shifts[0].Status);
         Assert.Equal("Shout runner", shifts.OpenShifts[0].RoleName);
+        Assert.Equal("Test Plugin Dividers", shifts.OpenShifts[0].EventTitle);
     }
 
     [Fact]

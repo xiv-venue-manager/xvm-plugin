@@ -71,7 +71,7 @@ public class XvmApiMappingTests
     {
         var open = new[]
         {
-            new XvmBoardShift(20, "2026-10-11T19:00:00Z", "2026-10-11T23:00:00Z", "Shout runner"),
+            new XvmBoardShift(20, "2026-10-11T19:00:00Z", "2026-10-11T23:00:00Z", "Shout runner", "Test Plugin Dividers"),
             new XvmBoardShift(21, "2026-10-12T19:00:00Z", "2026-10-12T23:00:00Z", "Bartender"),
         };
 
@@ -79,6 +79,8 @@ public class XvmApiMappingTests
 
         Assert.Equal("20", result.OpenShifts[0].Id);
         Assert.Equal("Shout runner", result.OpenShifts[0].RoleName);
+        Assert.Equal("Test Plugin Dividers", result.OpenShifts[0].EventTitle);
+        Assert.Null(result.OpenShifts[1].EventTitle);
         Assert.Equal("2026-10-12T19:00:00Z", result.OpenShifts[1].ScheduledStart);
     }
 

@@ -160,7 +160,7 @@ namespace VenueManager
     public async Task LoadVenueDataAsync(string venueId)
     {
       if (xivAppClient == null) return;
-      xivAppRoles = await xivAppClient.Venue.GetRolesAsync(venueId);
+      await RefreshRolesAsync(venueId);
       var servicesResp = await xivAppClient.Venue.GetServicesAsync(venueId);
       availableServices = servicesResp?.Services ?? new List<Service>();
       var bannedPatrons = await xivAppClient.Venue.GetBannedPatronsAsync(venueId);
@@ -168,6 +168,19 @@ namespace VenueManager
       xivAppBannedPatronsUnavailable = bannedPatrons == null;
       xivAppInventoryEnabled = await xivAppClient.Venue.GetInventoryEnabledAsync(venueId);
       Log.Information("Loaded venue {VenueId}: {Roles} roles, {Services} services, {Banned} banned", venueId, xivAppRoles.Count, availableServices.Count, xivAppBannedPatrons.Count);
+    }
+
+    public async Task RefreshRolesAsync(string venueId)
+    {
+      if (xivAppClient?.Xvm is not { } xvm) return;
+      try
+      {
+        xivAppRoles = await xvm.GetRolesAsync(venueId);
+      }
+      catch (Exception ex)
+      {
+        Log.Warning("Role refresh failed, keeping the previous roles: {0}", ex.Message);
+      }
     }
 
     internal (string Name, string World)? CurrentCharacter()
