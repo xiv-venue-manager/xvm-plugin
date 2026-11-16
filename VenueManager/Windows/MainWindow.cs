@@ -212,7 +212,7 @@ public class MainWindow : Window, IDisposable
         ImGui.PushStyleColor(ImGuiCol.ButtonActive,  Colors.XivSurface1);
         ImGui.PushStyleColor(ImGuiCol.Text, active ? Colors.XivBlue : Colors.XivOverlay0);
 
-        ImGui.PushFont(UiBuilder.IconFont);
+        ImGui.PushFont(IconFont.Font());
         bool clicked = ImGui.Button(
             $"{tab.Icon.ToIconString()}##nav{tab.Name}",
             new Vector2(SidebarWidth - 8f, NavButtonSize));

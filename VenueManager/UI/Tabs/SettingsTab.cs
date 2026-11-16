@@ -474,7 +474,7 @@ public class SettingsTab : ITab
       ImGui.EndCombo();
     }
     ImGui.SameLine();
-    if (ImGuiComponents.IconButton(FontAwesomeIcon.Music))
+    if (IconFont.IconButton(FontAwesomeIcon.Music))
     {
       plugin.playDoorbell();
     }
