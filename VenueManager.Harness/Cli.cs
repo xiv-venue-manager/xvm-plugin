@@ -23,6 +23,8 @@ public sealed class Cli
         }
     }
 
+    public static int ClampWait(int seconds) => Math.Clamp(seconds, 0, 60);
+
     private void Handle(string verb, string rest, TextWriter output)
     {
         switch (verb)
@@ -34,6 +36,11 @@ public sealed class Cli
                 break;
             case "step":
                 host.Step(int.TryParse(rest, out var frames) ? frames : 1);
+                output.WriteLine("ok");
+                break;
+            case "wait":
+                Thread.Sleep(TimeSpan.FromSeconds(ClampWait(int.TryParse(rest, out var seconds) ? seconds : 2)));
+                host.Step(2);
                 output.WriteLine("ok");
                 break;
             case "tree":

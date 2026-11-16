@@ -14,9 +14,16 @@ public static class Program
             return 1;
         }
 
-        var options = new HarnessOptions(
-            Environment.GetEnvironmentVariable("XVM_HARNESS_URL"),
-            Environment.GetEnvironmentVariable("XVM_HARNESS_SECRET"));
+        var url = Environment.GetEnvironmentVariable("XVM_HARNESS_URL");
+        var secret = Environment.GetEnvironmentVariable("XVM_HARNESS_SECRET");
+        var config = Environment.GetEnvironmentVariable("XVM_HARNESS_CONFIG");
+        if (!string.IsNullOrEmpty(config) && (!string.IsNullOrEmpty(url) || !string.IsNullOrEmpty(secret)))
+        {
+            Console.Error.WriteLine("XVM_HARNESS_CONFIG cannot be combined with XVM_HARNESS_URL or XVM_HARNESS_SECRET.");
+            return 1;
+        }
+
+        var options = new HarnessOptions(url, secret, string.IsNullOrEmpty(config) ? null : config);
 
         using var host = PluginHost.Start(options);
         new Cli(host).Run(Console.In, Console.Out);

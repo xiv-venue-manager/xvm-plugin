@@ -85,4 +85,17 @@ public class CliTests
             File.Delete(path);
         }
     }
+
+    [Fact]
+    public void Wait_zero_prints_ok()
+    {
+        Assert.Contains("ok", Run("wait 0\nquit\n"));
+    }
+
+    [Fact]
+    public void Wait_is_clamped_to_zero_through_sixty()
+    {
+        Assert.Equal(60, Cli.ClampWait(9999));
+        Assert.Equal(0, Cli.ClampWait(-5));
+    }
 }

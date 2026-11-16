@@ -29,6 +29,7 @@ printf 'open Main\ntabs\ntree\nquit\n' | dotnet run --project VenueManager.Harne
 | `tree` | Prints every visible text item as `(x,y) text` |
 | `tap TEXT` | Clicks the item with exactly that label |
 | `command TEXT` | Runs a registered chat command, for example `command /xvm snooze` |
+| `wait [SECONDS]` | Sleeps real time (default 2, max 60), then draws two frames, so network data can arrive |
 | `step [N]` | Draws N more frames |
 | `shot PATH` | Writes a PNG screenshot |
 | `state` | Prints the selected tab and the number of logged errors and warnings |
@@ -46,6 +47,14 @@ XVM_HARNESS_URL=http://127.0.0.1:8000 XVM_HARNESS_SECRET=<pairing secret> \
 ```
 
 A secret needs an explicit URL, so the harness never contacts the production API by accident. Use a local or dev xvm-api. The plugin's own settings and venue data are never read or written: the harness uses a temporary folder.
+
+## Using your dev plugin config
+
+```bash
+XVM_HARNESS_CONFIG=~/.xlcore/pluginConfigs/XIVVenueManagerSyncDev.json dotnet run --project VenueManager.Harness
+```
+
+The file is only read: nothing is written back. The harness can only talk to the dev API (`dev-api.xivvenuemanager.com`) or a loopback address, with no override; any other URL, including production, is refused. Reads are harmless, but taps like Claim or Clock in write to whatever API the config points at. Use `wait` after `open` or `tab` to let the background fetches finish before `tree`. `XVM_HARNESS_CONFIG` cannot be combined with `XVM_HARNESS_URL` or `XVM_HARNESS_SECRET`.
 
 Known limits: some saves and the doorbell fail on Linux and are logged (see `state`); two text items on one line read back as one.
 

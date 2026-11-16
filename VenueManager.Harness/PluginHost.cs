@@ -5,11 +5,12 @@ using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using Newtonsoft.Json;
 using VenueManager.UI;
 
 namespace VenueManager.Harness;
 
-public sealed record HarnessOptions(string? ApiUrl = null, string? ApiSecret = null);
+public sealed record HarnessOptions(string? ApiUrl = null, string? ApiSecret = null, string? ConfigPath = null);
 
 public sealed class PluginHost : IDisposable
 {
@@ -30,6 +31,8 @@ public sealed class PluginHost : IDisposable
         ("Notifications", typeof(INotificationManager)),
     };
 
+    private static readonly string[] AllowedHosts = { "dev-api.xivvenuemanager.com", "localhost", "127.0.0.1" };
+
     private readonly ImGuiHost imgui;
     private readonly Plugin plugin;
     private readonly string configDir;
@@ -44,7 +47,7 @@ public sealed class PluginHost : IDisposable
     public int Height { get; }
     public IReadOnlyList<string> Log => logLines;
 
-    private PluginHost(HarnessOptions options, int width, int height)
+    private PluginHost(Configuration config, int width, int height)
     {
         Width = width;
         Height = height;
@@ -54,7 +57,7 @@ public sealed class PluginHost : IDisposable
         Fake.Reset();
         Fake.Overrides["IDalamudPluginInterface.get_ConfigDirectory"] = _ => new DirectoryInfo(configDir);
         Fake.Overrides["IDalamudPluginInterface.get_AssemblyLocation"] = _ => new FileInfo(typeof(Plugin).Assembly.Location);
-        Fake.Overrides["IDalamudPluginInterface.GetPluginConfig"] = _ => ConfigFor(options);
+        Fake.Overrides["IDalamudPluginInterface.GetPluginConfig"] = _ => config;
         Fake.Overrides["ICommandManager.AddHandler"] = args =>
         {
             commands[(string)args[0]!] = (CommandInfo)args[1]!;
@@ -83,10 +86,32 @@ public sealed class PluginHost : IDisposable
         if (!string.IsNullOrEmpty(options.ApiSecret) && string.IsNullOrWhiteSpace(options.ApiUrl))
             throw new ArgumentException("A secret needs an explicit ApiUrl, so the harness never contacts the production API by accident.", nameof(options));
 
-        return new PluginHost(options, width, height);
+        if (!string.IsNullOrEmpty(options.ConfigPath))
+        {
+            if (!string.IsNullOrEmpty(options.ApiUrl) || !string.IsNullOrEmpty(options.ApiSecret))
+                throw new ArgumentException("ConfigPath cannot be combined with ApiUrl or ApiSecret.", nameof(options));
+            if (!File.Exists(options.ConfigPath))
+                throw new FileNotFoundException("Config file not found.", options.ConfigPath);
+        }
+
+        var config = ConfigFor(options);
+        if (!string.IsNullOrEmpty(options.ConfigPath)) CheckApiUrl(config.xvmApiUrl);
+        else if (!string.IsNullOrEmpty(options.ApiUrl)) CheckApiUrl(options.ApiUrl);
+
+        return new PluginHost(config, width, height);
+    }
+
+    public static void CheckApiUrl(string? url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+            || !AllowedHosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase))
+            throw new ArgumentException("The harness only talks to dev-api.xivvenuemanager.com, localhost or 127.0.0.1.");
     }
 
     public ImGuiHost Imgui => imgui;
+
+    public Configuration Configuration => plugin.Configuration;
 
     public IReadOnlyList<string> Tabs => TabList().Select(TabName).ToList();
 
@@ -183,7 +208,18 @@ public sealed class PluginHost : IDisposable
 
     private static Configuration ConfigFor(HarnessOptions options)
     {
-        var config = new Configuration { LastSeenVersion = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "" };
+        var version = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "";
+        if (!string.IsNullOrEmpty(options.ConfigPath))
+        {
+            var loaded = JsonConvert.DeserializeObject<Configuration>(
+                File.ReadAllText(options.ConfigPath),
+                new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.Objects })
+                ?? throw new InvalidDataException("Config file did not contain a plugin configuration");
+            loaded.LastSeenVersion = version;
+            return loaded;
+        }
+
+        var config = new Configuration { LastSeenVersion = version };
         if (!string.IsNullOrEmpty(options.ApiSecret))
         {
             config.xvmApiUrl = options.ApiUrl!;
