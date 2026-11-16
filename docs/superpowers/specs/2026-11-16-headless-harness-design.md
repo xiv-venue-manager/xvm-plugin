@@ -75,14 +75,23 @@ Most interface members are unused. A `DispatchProxy` per interface, with handler
 
 ### Game-dependent call sites
 
-Only four places in `UI/` touch the game:
+Five places in `UI/` touch the game:
 
+- Icon font: `ImGui.PushFont(UiBuilder.IconFont)` and `ImGuiComponents.IconButton`. `UiBuilder.IconFont` waits for an in-game Dalamud service, so any draw of the sidebar hangs outside the game. Done: these calls go through `IconFont` (xvm-plugin-dev#30, merged), whose defaults call exactly what the code called before. The harness replaces its three delegates.
 - `SalesTab`: `Plugin.TargetManager.Target`. Covered by the fake target.
 - `SettingsTab:508`: `DataManager.GetExcelSheet<Map>()` and `AgentMap.Instance()`. Wrapped so the harness reports "no map data" instead of dereferencing game memory.
 - `VenuesTab:34`: `TextureProvider.GetFromGameIcon`. The fake returns an empty wrap and the tab draws its fallback.
 - `Plugin.cs` territory and object-table scans. Not exercised by the harness.
 
 Each gate is a small, named seam in plugin code. No behaviour changes in game.
+
+### Findings from the boot spike (2026-11-16)
+
+- The real `VenueManager.csproj` builds as a project reference from Linux when the harness targets `net10.0-windows7.0` with `EnableWindowsTargeting`. The Dalamud assemblies it uses are not exposed through the reference, so the harness references them itself from the Dalamud folder.
+- `new Plugin()` constructs against `DispatchProxy` fakes that return defaults. The constructor touches about 25 members across `IDalamudPluginInterface`, `IClientState`, `IFramework`, `ICommandManager`, `IDtrBar` and its entry, `IUiBuilder`, `IPluginLog`. `ConfigDirectory`, `AssemblyLocation` and `GetPluginConfig` need real answers (a temp folder, the plugin assembly, and null).
+- `WindowSystem.Draw()` draws nothing outside the game, because it depends on Dalamud internals. The harness draws the windows itself: for each open `Window`, an ImGui window with its `WindowName`, then `PreDraw`, `Draw`, `PostDraw`. The window `Toggle()` event path also does not open windows, so the harness sets `IsOpen`.
+- Expected logged errors, all caught by the plugin: Dalamud's safe file write needs Windows file APIs, so the venue list and config do not persist; NAudio needs `winmm`, so the doorbell does not load; the housing manager address is unresolved.
+- With no account linked the main window shows the Settings tab. Other tabs need the plugin state a linked account produces, so the harness seeds it (C3) or sets the selected tab.
 
 ### Native ImGui and Dalamud
 
