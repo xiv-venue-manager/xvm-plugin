@@ -169,6 +169,8 @@ public sealed class PluginHost : IDisposable
 
     public void Step(int frames = 1) => imgui.Step(frames);
 
+    public void Step(int frames, float deltaSeconds) => imgui.Step(frames, deltaSeconds);
+
     public IReadOnlyList<string> Tree() => imgui.ReadText()
         .OrderBy(r => (int)r.Y)
         .ThenBy(r => r.X)

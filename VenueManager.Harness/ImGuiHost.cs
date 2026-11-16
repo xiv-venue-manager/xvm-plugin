@@ -40,7 +40,6 @@ public sealed class ImGuiHost : IDisposable
         io = ImGui.GetIO();
         io.IniFilename = null;
         io.DisplaySize = new Vector2(width, height);
-        io.DeltaTime = 1f / 60f;
 
         if (textFontPath is not null && File.Exists(textFontPath))
         {
@@ -92,8 +91,11 @@ public sealed class ImGuiHost : IDisposable
         io.DisplaySize = new Vector2(width, height);
     }
 
-    public void Step(int frames)
+    public void Step(int frames) => Step(frames, 1f / 60f);
+
+    public void Step(int frames, float deltaSeconds)
     {
+        io.DeltaTime = Math.Clamp(deltaSeconds, 1f / 240f, 0.1f);
         for (var i = 0; i < frames; i++)
         {
             ImGui.NewFrame();

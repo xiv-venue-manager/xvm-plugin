@@ -332,4 +332,62 @@ public class ImGuiHostTests
 
         Assert.NotEqual(before, host.DrawDataHash());
     }
+
+    private static List<float> RecordDeltas(Action<ImGuiHost> run)
+    {
+        var deltas = new List<float>();
+        using var host = new ImGuiHost(400, 300) { Draw = () => deltas.Add(ImGui.GetIO().DeltaTime) };
+        run(host);
+        return deltas;
+    }
+
+    [Fact]
+    public void Step_with_delta_applies_it_to_every_frame()
+    {
+        var deltas = RecordDeltas(h => h.Step(2, 0.05f));
+
+        Assert.Equal(new[] { 0.05f, 0.05f }, deltas);
+    }
+
+    [Fact]
+    public void Step_without_delta_uses_one_sixtieth()
+    {
+        var deltas = RecordDeltas(h => h.Step(1));
+
+        Assert.Equal(1f / 60f, deltas.Single(), 1e-6f);
+    }
+
+    [Fact]
+    public void Step_clamps_the_delta()
+    {
+        var deltas = RecordDeltas(h =>
+        {
+            h.Step(1, 0f);
+            h.Step(1, 5f);
+        });
+
+        Assert.Equal(1f / 240f, deltas[0], 1e-6f);
+        Assert.Equal(0.1f, deltas[1], 1e-6f);
+    }
+
+    private static int BackspaceDeletions(float delta)
+    {
+        var value = "";
+        using var host = InputHost(v => value = v);
+        ClickField(host);
+        for (var i = 0; i < 20; i++) host.Char('a');
+        host.Step(2);
+        var before = value.Length;
+
+        host.Key(ImGuiKey.Backspace, true);
+        host.Step(10, delta);
+
+        return before - value.Length;
+    }
+
+    [Fact]
+    public void Held_key_repeats_faster_with_larger_deltas()
+    {
+        Assert.True(BackspaceDeletions(0.1f) > BackspaceDeletions(0.01f));
+    }
 }

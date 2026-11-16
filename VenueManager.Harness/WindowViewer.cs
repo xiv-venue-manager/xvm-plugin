@@ -49,6 +49,7 @@ void main()
         ulong lastHash = 0;
         var first = true;
         var sinceStep = 0.0;
+        var stepClock = Stopwatch.StartNew();
         var frames = 0;
         var uploads = 0;
         var uploadMs = 0.0;
@@ -148,7 +149,8 @@ void main()
             if (first || sinceStep >= StepSeconds)
             {
                 sinceStep = 0;
-                host.Step(1);
+                host.Step(1, (float)stepClock.Elapsed.TotalSeconds);
+                stepClock.Restart();
                 var hash = host.Imgui.DrawDataHash();
                 if (first || shotPath is not null || hash != lastHash)
                 {
