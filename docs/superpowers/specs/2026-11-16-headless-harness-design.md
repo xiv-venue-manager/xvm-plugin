@@ -86,7 +86,7 @@ Each gate is a small, named seam in plugin code. No behaviour changes in game.
 
 ### Native ImGui and Dalamud
 
-The harness loads the same managed Dalamud assemblies the plugin already builds against (`~/.xlcore/dalamud/Hooks/dev`), so it works with the game down. `Dalamud.Bindings.ImGui` needs a native `libcimgui` for Linux; the Windows `cimgui.dll` in that folder is no use here. The harness bootstrap builds `libcimgui.so` from goatcorp's gc-cimgui at the commit matching the installed Dalamud, or reuses an existing build. The first task of C1 is to confirm that a bare frame loop runs with it, before any fake is written.
+The harness loads the same managed Dalamud assemblies the plugin already builds against (`~/.xlcore/dalamud/Hooks/dev`), so it works with the game down. `Dalamud.Bindings.ImGui` needs a native `libcimgui` for Linux; the Windows `cimgui.dll` in that folder is no use here. Aetherphone's harness bootstrap already builds a matching `libcimgui.so` into `~/.aetherphone-harness/native`, and keeps its cached Dalamud current. On 2026-11-16 its `Dalamud.dll` and `Dalamud.Bindings.ImGui.dll` are byte-identical to the installed ones in `~/.xlcore/dalamud/Hooks/dev` (same md5), so the struct layouts match. The harness reuses that library, found through `AETHERPHONE_HARNESS_CACHE` or the default path, and fails with a clear message if the two Dalamud builds differ. The first task of C1 is still a bare frame loop through the bindings, before any fake is written.
 
 ## Data flow
 
@@ -105,7 +105,7 @@ Fake members the plugin calls but we did not implement throw `NotImplementedExce
 ## Risks
 
 - Dalamud API bumps can break a fake. The fakes live in one folder and fail at compile time, so drift is loud.
-- The native library must match the Dalamud ImGui struct layout. Confirmed first, as noted above.
+- The native library must match the Dalamud ImGui struct layout. Matches today. A Dalamud update that the Aetherphone cache has not picked up yet would break it, so the harness compares the two bindings files at start and reports the mismatch.
 - Referencing a `net10.0-windows7.0` project from the harness needs `EnableWindowsTargeting`. Verify the build on Linux before relying on it.
 
 ## Order of work
