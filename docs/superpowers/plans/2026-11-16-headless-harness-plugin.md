@@ -15,6 +15,8 @@
 
 **Not verified until the tasks run:** the exact member names of `CommandInfo`, `Notification` and `IFramework.Update` (tasks say what to do if a name differs), and anything about drawing the non-Settings tabs.
 
+**Superseded in part:** this plan was written with `XVM_HARNESS_URL` and `XVM_HARNESS_SECRET`. The shipped harness has no such variables. It authenticates only through a dev pairing code and a per-user session, and only talks to the dev API or a loopback address. See `docs/HARNESS.md` for the current behaviour.
+
 **Safety:** a configured secret makes the plugin contact the configured API URL, and the prod URL if none is set. `PluginHost` therefore refuses a secret without an explicit URL. Tests use `http://127.0.0.1:1`, which refuses connections. The harness never reads or writes the real plugin config: it uses a temporary folder. Do not tap "Open xivvenuemanager.com" or other link buttons, because the plugin opens links with the system browser.
 
 Work in `~/xvm-plugin-harness` on branch `feat/harness`.
@@ -1172,7 +1174,7 @@ Expected: `Passed!`, 33 tests. If a `Dalamud.Bindings.ImGui` member name used ab
 
 - [ ] **Step 8: Look at a real screenshot**
 
-Run: `cd ~/xvm-plugin-harness && printf 'open Main\nshot /tmp/claude-1000/-home-ehno/b9bc0b6e-c74c-45fb-8831-f1756f016665/scratchpad/main.png\nquit\n' | dotnet run --project VenueManager.Harness 2>&1 | tail -3`
+Run: `cd ~/xvm-plugin-harness && printf 'open Main\nshot /tmp/main.png\nquit\n' | dotnet run --project VenueManager.Harness 2>&1 | tail -3`
 Expected: `wrote ...main.png`. Then open the file with the Read tool (it displays PNGs) and describe what you see: is there a window with a title, text, a sidebar of `?` boxes, and readable text? Report honestly if it looks wrong (inverted, black, shifted, tiled).
 
 - [ ] **Step 9: Commit**
