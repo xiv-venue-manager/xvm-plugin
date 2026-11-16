@@ -164,7 +164,7 @@ public class VenuesTab : ITab
         bool isApartment = venue.Value.plot <= 0;
         bool canTeleport = lifestream.IsAvailable && !isApartment;
         if (!canTeleport) ImGui.BeginDisabled();
-        if (ImGuiComponents.IconButton("##Teleport" + venue.Value.houseId, FontAwesomeIcon.MapMarkerAlt))
+        if (IconFont.IconButtonWithId("##Teleport" + venue.Value.houseId, FontAwesomeIcon.MapMarkerAlt))
         {
           lifestream.TeleportToVenue(venue.Value);
         }
@@ -179,7 +179,7 @@ public class VenuesTab : ITab
         if (!canTeleport) ImGui.EndDisabled();
 
         ImGui.TableNextColumn();
-        if (ImGuiComponents.IconButton("##Copy" + venue.Value.houseId, FontAwesomeIcon.Copy))
+        if (IconFont.IconButtonWithId("##Copy" + venue.Value.houseId, FontAwesomeIcon.Copy))
         {
           ImGui.SetClipboardText(venue.Value.getVenueAddress());
         }
@@ -222,7 +222,7 @@ public class VenuesTab : ITab
           ImGui.BeginDisabled();
           disabled = true;
         }
-        if (ImGuiComponents.IconButton("##" + venue.Value.houseId, FontAwesomeIcon.Trash))
+        if (IconFont.IconButtonWithId("##" + venue.Value.houseId, FontAwesomeIcon.Trash))
         {
           plugin.venueList.venues.Remove(venue.Value.houseId);
           plugin.venueList.save();
@@ -235,7 +235,7 @@ public class VenuesTab : ITab
 
         // Notes Section 
         ImGui.TableNextColumn();
-        if (ImGuiComponents.IconButton("##Notes" + venue.Value.houseId, FontAwesomeIcon.StickyNote))
+        if (IconFont.IconButtonWithId("##Notes" + venue.Value.houseId, FontAwesomeIcon.StickyNote))
         {
           plugin.ShowNotesWindow(venue.Value);
         }

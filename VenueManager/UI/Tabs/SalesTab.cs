@@ -140,7 +140,7 @@ public class SalesTab : ITab
     ImGui.InputText("##sales-customer", ref customerName, 64);
     ImGui.SameLine();
     // Icon button: crosshair = "use target"
-    ImGui.PushFont(UiBuilder.IconFont);
+    ImGui.PushFont(IconFont.Font());
     if (ImGui.Button($"{FontAwesomeIcon.Crosshairs.ToIconString()}##target", new Vector2(iconBtnW, iconBtnW)))
     {
       var target = Plugin.TargetManager.Target;
