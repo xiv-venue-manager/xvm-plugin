@@ -9,6 +9,11 @@ public sealed class ImGuiHost : IDisposable
     private readonly ImGuiIOPtr io;
     private readonly Dictionary<(float, float), (uint Codepoint, float X0, float Advance)> glyphs = new();
     private readonly float fontSize;
+    private readonly byte[] atlas;
+    private readonly int atlasWidth;
+    private readonly int atlasHeight;
+    private readonly int width;
+    private readonly int height;
 
     public Action Draw { get; set; } = () => { };
 
@@ -21,8 +26,13 @@ public sealed class ImGuiHost : IDisposable
         io.DeltaTime = 1f / 60f;
 
         byte* pixels;
-        int atlasWidth, atlasHeight;
-        io.Fonts.GetTexDataAsRGBA32(0, &pixels, &atlasWidth, &atlasHeight);
+        int w, h;
+        io.Fonts.GetTexDataAsRGBA32(0, &pixels, &w, &h);
+        atlasWidth = w;
+        atlasHeight = h;
+        atlas = new ReadOnlySpan<byte>(pixels, w * h * 4).ToArray();
+        this.width = width;
+        this.height = height;
 
         var font = io.Fonts.Fonts[0];
         fontSize = font.FontSize;
@@ -132,6 +142,8 @@ public sealed class ImGuiHost : IDisposable
 
         return runs;
     }
+
+    public byte[] Screenshot() => Rasterizer.Render(ImGui.GetDrawData(), atlas, atlasWidth, atlasHeight, width, height);
 
     public void Dispose() => ImGui.DestroyContext();
 }

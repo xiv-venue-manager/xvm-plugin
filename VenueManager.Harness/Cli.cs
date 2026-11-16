@@ -64,6 +64,10 @@ public sealed class Cli
                 output.WriteLine($"tab: {host.CurrentTab}");
                 output.WriteLine($"log lines: {host.Log.Count}");
                 break;
+            case "shot":
+                File.WriteAllBytes(rest, Png.Encode(host.Imgui.Screenshot(), host.Width, host.Height));
+                output.WriteLine($"wrote {rest}");
+                break;
             default:
                 output.WriteLine($"unknown command: {verb}");
                 break;

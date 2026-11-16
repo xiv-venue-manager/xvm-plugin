@@ -68,4 +68,21 @@ public class CliTests
 
         Assert.DoesNotContain("Settings", output);
     }
+
+    [Fact]
+    public void Shot_writes_a_png_file()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "vm-shot-" + Guid.NewGuid().ToString("N") + ".png");
+        try
+        {
+            var output = Run($"open Main\nshot {path}\nquit\n");
+
+            Assert.Contains($"wrote {path}", output);
+            Assert.Equal(0x89, File.ReadAllBytes(path)[0]);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
 }
