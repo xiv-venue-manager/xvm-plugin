@@ -1,3 +1,4 @@
+using VenueManager;
 using VenueManager.Harness;
 using Xunit;
 
@@ -203,5 +204,23 @@ public class PluginHostTests
         Assert.False(host.SelectVenue("Alpha"));
         Assert.False(host.SelectVenue("nope"));
         Assert.Null(host.Plugin.currentXivAppVenueId);
+    }
+
+    [Fact]
+    public void Unlinked_host_points_the_configuration_at_the_dev_api()
+    {
+        using var host = PluginHost.Start(new HarnessOptions());
+
+        Assert.Equal(XvmApiPairing.DevUrl, host.Configuration.xvmApiUrl);
+        Assert.Equal(host.ApiUrl, host.Configuration.xvmApiUrl);
+        PluginHost.CheckApiUrl(host.Configuration.xvmApiUrl);
+    }
+
+    [Fact]
+    public void Explicit_api_url_is_kept_in_the_configuration()
+    {
+        using var host = PluginHost.Start(new HarnessOptions("http://127.0.0.1:1", null));
+
+        Assert.Equal("http://127.0.0.1:1", host.Configuration.xvmApiUrl);
     }
 }

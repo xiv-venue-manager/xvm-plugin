@@ -249,12 +249,12 @@ public sealed class PluginHost : IDisposable
     private static Configuration ConfigFor(HarnessOptions options)
     {
         var version = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "";
-        var config = new Configuration { LastSeenVersion = version };
-        if (!string.IsNullOrEmpty(options.ApiSecret))
+        var config = new Configuration
         {
-            config.xvmApiUrl = options.ApiUrl!;
-            config.xvmApiSecret = options.ApiSecret;
-        }
+            LastSeenVersion = version,
+            xvmApiUrl = string.IsNullOrWhiteSpace(options.ApiUrl) ? XvmApiPairing.DevUrl : options.ApiUrl,
+        };
+        if (!string.IsNullOrEmpty(options.ApiSecret)) config.xvmApiSecret = options.ApiSecret;
 
         return config;
     }
