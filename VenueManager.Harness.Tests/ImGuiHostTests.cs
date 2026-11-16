@@ -169,4 +169,123 @@ public class ImGuiHostTests
         Assert.Contains(runs, r => r.Text == "\u2713 Link your account");
         Assert.Contains(runs, r => r.Text == "\u25CF \u25CB");
     }
+
+    private static ImGuiHost InputHost(Action<string> write)
+    {
+        var text = "";
+        var host = new ImGuiHost(400, 300);
+        host.Draw = () =>
+        {
+            ImGui.SetNextWindowPos(new Vector2(10, 10));
+            ImGui.SetNextWindowSize(new Vector2(300, 100));
+            ImGui.Begin("Input");
+            ImGui.SetNextItemWidth(200);
+            ImGui.InputText("##field", ref text, 64);
+            ImGui.End();
+            write(text);
+        };
+        return host;
+    }
+
+    private static void ClickField(ImGuiHost host)
+    {
+        host.Step(3);
+        host.MouseMove(60, 55);
+        host.Step(2);
+        host.MouseButton(0, true);
+        host.Step(2);
+        host.MouseButton(0, false);
+        host.Step(2);
+    }
+
+    [Fact]
+    public void Raw_mouse_methods_click_a_button()
+    {
+        var claims = 0;
+        using var host = new ImGuiHost(400, 300)
+        {
+            Draw = () =>
+            {
+                ImGui.SetNextWindowPos(new Vector2(10, 10));
+                ImGui.Begin("Spike");
+                if (ImGui.Button("Claim")) claims++;
+                ImGui.End();
+            }
+        };
+        host.Step(3);
+        var run = host.ReadText().Single(r => r.Text == "Claim");
+
+        host.MouseMove(run.CenterX, run.CenterY);
+        host.Step(2);
+        host.MouseButton(0, true);
+        host.Step(1);
+        host.MouseButton(0, false);
+        host.Step(2);
+
+        Assert.Equal(1, claims);
+    }
+
+    [Fact]
+    public void Char_types_into_a_focused_input()
+    {
+        var value = "";
+        using var host = InputHost(v => value = v);
+        ClickField(host);
+
+        host.Char('h');
+        host.Step(2);
+        host.Char('i');
+        host.Step(2);
+
+        Assert.Equal("hi", value);
+    }
+
+    [Fact]
+    public void Backspace_key_removes_the_last_typed_character()
+    {
+        var value = "";
+        using var host = InputHost(v => value = v);
+        ClickField(host);
+        host.Char('h');
+        host.Step(2);
+        host.Char('i');
+        host.Step(2);
+
+        host.Key(ImGuiKey.Backspace, true);
+        host.Step(2);
+        host.Key(ImGuiKey.Backspace, false);
+        host.Step(2);
+
+        Assert.Equal("h", value);
+    }
+
+    [Fact]
+    public void MouseWheel_scrolls_a_child_window()
+    {
+        var scroll = 0f;
+        using var host = new ImGuiHost(400, 300)
+        {
+            Draw = () =>
+            {
+                ImGui.SetNextWindowPos(new Vector2(10, 10));
+                ImGui.SetNextWindowSize(new Vector2(300, 200));
+                ImGui.Begin("Scroll");
+                if (ImGui.BeginChild("list", new Vector2(250, 100)))
+                {
+                    for (var i = 0; i < 50; i++) ImGui.Text($"Line {i}");
+                    scroll = ImGui.GetScrollY();
+                }
+                ImGui.EndChild();
+                ImGui.End();
+            }
+        };
+        host.Step(3);
+        host.MouseMove(60, 60);
+        host.Step(2);
+
+        host.MouseWheel(0, -3);
+        host.Step(3);
+
+        Assert.True(scroll > 0);
+    }
 }

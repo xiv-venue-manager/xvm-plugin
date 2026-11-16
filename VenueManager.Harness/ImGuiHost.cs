@@ -20,6 +20,12 @@ public sealed class ImGuiHost : IDisposable
 
     private const float TextFontSize = 17f;
 
+    static ImGuiHost()
+    {
+        NativeLibrary.SetDllImportResolver(typeof(ImGui).Assembly, (name, _, _) =>
+            name == "cimgui" ? NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, "cimgui.dll")) : IntPtr.Zero);
+    }
+
     public bool HasIconFont { get; }
 
     public ImFontPtr IconFontHandle { get; }
@@ -87,13 +93,26 @@ public sealed class ImGuiHost : IDisposable
         }
     }
 
+    public void MouseMove(float x, float y) => io.AddMousePosEvent(x, y);
+
+    public void MouseButton(int button, bool down) => io.AddMouseButtonEvent(button, down);
+
+    public void MouseWheel(float x, float y) => io.AddMouseWheelEvent(x, y);
+
+    public void Key(ImGuiKey key, bool down) => io.AddKeyEvent(key, down);
+
+    public void Char(uint codepoint)
+    {
+        foreach (var unit in char.ConvertFromUtf32((int)codepoint)) io.AddInputCharacter(unit);
+    }
+
     public void Tap(float x, float y)
     {
-        io.AddMousePosEvent(x, y);
+        MouseMove(x, y);
         Step(2);
-        io.AddMouseButtonEvent(0, true);
+        MouseButton(0, true);
         Step(1);
-        io.AddMouseButtonEvent(0, false);
+        MouseButton(0, false);
         Step(2);
     }
 
