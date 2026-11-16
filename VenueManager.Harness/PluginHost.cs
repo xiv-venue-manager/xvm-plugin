@@ -1,0 +1,188 @@
+using System.Numerics;
+using System.Reflection;
+using Dalamud.Bindings.ImGui;
+using Dalamud.Game.Command;
+using Dalamud.Interface.Windowing;
+using Dalamud.Plugin;
+using Dalamud.Plugin.Services;
+using VenueManager.UI;
+
+namespace VenueManager.Harness;
+
+public sealed record HarnessOptions(string? ApiUrl = null, string? ApiSecret = null);
+
+public sealed class PluginHost : IDisposable
+{
+    private static readonly (string Property, Type Service)[] Services =
+    {
+        ("PluginInterface", typeof(IDalamudPluginInterface)),
+        ("ClientState", typeof(IClientState)),
+        ("Framework", typeof(IFramework)),
+        ("DataManager", typeof(IDataManager)),
+        ("TextureProvider", typeof(ITextureProvider)),
+        ("Objects", typeof(IObjectTable)),
+        ("PlayerState", typeof(IPlayerState)),
+        ("Log", typeof(IPluginLog)),
+        ("Chat", typeof(IChatGui)),
+        ("TargetManager", typeof(ITargetManager)),
+        ("CommandManager", typeof(ICommandManager)),
+        ("DtrBar", typeof(IDtrBar)),
+        ("Notifications", typeof(INotificationManager)),
+    };
+
+    private readonly ImGuiHost imgui;
+    private readonly Plugin plugin;
+    private readonly string configDir;
+    private readonly Dictionary<string, CommandInfo> commands = new();
+    private readonly List<string> logLines = new();
+    private readonly Func<ImFontPtr> originalFont = IconFont.Font;
+    private readonly Func<Dalamud.Interface.FontAwesomeIcon, bool> originalButton = IconFont.IconButton;
+    private readonly Func<string, Dalamud.Interface.FontAwesomeIcon, bool> originalButtonWithId = IconFont.IconButtonWithId;
+    private Window? open;
+
+    public int Width { get; }
+    public int Height { get; }
+    public IReadOnlyList<string> Log => logLines;
+
+    private PluginHost(HarnessOptions options, int width, int height)
+    {
+        Width = width;
+        Height = height;
+        configDir = Path.Combine(Path.GetTempPath(), "vm-harness-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(configDir);
+
+        Fake.Reset();
+        Fake.Overrides["IDalamudPluginInterface.get_ConfigDirectory"] = _ => new DirectoryInfo(configDir);
+        Fake.Overrides["IDalamudPluginInterface.get_AssemblyLocation"] = _ => new FileInfo(typeof(Plugin).Assembly.Location);
+        Fake.Overrides["IDalamudPluginInterface.GetPluginConfig"] = _ => ConfigFor(options);
+        Fake.Overrides["ICommandManager.AddHandler"] = args =>
+        {
+            commands[(string)args[0]!] = (CommandInfo)args[1]!;
+            return true;
+        };
+        Fake.Overrides["ICommandManager.RemoveHandler"] = args => commands.Remove((string)args[0]!);
+        Fake.Overrides["IPluginLog.Error"] = args => Record("error", args);
+        Fake.Overrides["IPluginLog.Warning"] = args => Record("warning", args);
+
+        foreach (var (property, service) in Services)
+        {
+            typeof(Plugin).GetProperty(property, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)!
+                .SetValue(null, Fake.Make(service));
+        }
+
+        IconFont.Font = () => ImGui.GetFont();
+        IconFont.IconButton = icon => ImGui.Button($"[{icon}]##{icon}");
+        IconFont.IconButtonWithId = (id, icon) => ImGui.Button($"[{icon}]{id}");
+
+        imgui = new ImGuiHost(width, height);
+        plugin = new Plugin();
+        imgui.Draw = DrawOpenWindow;
+    }
+
+    public static PluginHost Start(HarnessOptions options, int width = 900, int height = 700)
+    {
+        if (!string.IsNullOrEmpty(options.ApiSecret) && string.IsNullOrWhiteSpace(options.ApiUrl))
+            throw new ArgumentException("A secret needs an explicit ApiUrl, so the harness never contacts the production API by accident.", nameof(options));
+
+        return new PluginHost(options, width, height);
+    }
+
+    public ImGuiHost Imgui => imgui;
+
+    public IReadOnlyList<string> Tabs => TabList().Select(TabName).ToList();
+
+    public string CurrentTab => TabName(CurrentTabField().GetValue(MainWindow())!);
+
+    public void Open(string nameContains)
+    {
+        var window = plugin.WindowSystem.Windows.OfType<Window>().FirstOrDefault(w => w.WindowName.Contains(nameContains, StringComparison.OrdinalIgnoreCase))
+            ?? throw new ArgumentException($"No window containing '{nameContains}'");
+
+        foreach (var other in plugin.WindowSystem.Windows) other.IsOpen = false;
+        window.IsOpen = true;
+        open = window;
+    }
+
+    public void Step(int frames = 1) => imgui.Step(frames);
+
+    public IReadOnlyList<string> Tree() => imgui.ReadText()
+        .OrderBy(r => (int)r.Y)
+        .ThenBy(r => r.X)
+        .Select(r => $"({r.X:0},{r.Y:0}) {r.Text}")
+        .ToList();
+
+    public bool Tap(string text) => imgui.TapText(text);
+
+    public bool SelectTab(string name)
+    {
+        var tab = TabList().FirstOrDefault(t => string.Equals(TabName(t), name, StringComparison.OrdinalIgnoreCase));
+        if (tab is null) return false;
+
+        CurrentTabField().SetValue(MainWindow(), tab);
+        return true;
+    }
+
+    public bool Command(string line)
+    {
+        var match = commands.Keys
+            .Where(key => line == key || line.StartsWith(key + " ", StringComparison.Ordinal))
+            .OrderByDescending(key => key.Length)
+            .FirstOrDefault();
+        if (match is null) return false;
+
+        var arguments = line.Length > match.Length ? line[(match.Length + 1)..] : "";
+        commands[match].Handler(match, arguments);
+        return true;
+    }
+
+    public void Dispose()
+    {
+        try { plugin.Dispose(); } catch { }
+        imgui.Dispose();
+        IconFont.Font = originalFont;
+        IconFont.IconButton = originalButton;
+        IconFont.IconButtonWithId = originalButtonWithId;
+        try { Directory.Delete(configDir, true); } catch { }
+    }
+
+    private void DrawOpenWindow()
+    {
+        if (open is null || !open.IsOpen) return;
+
+        ImGui.SetNextWindowPos(new Vector2(10, 10));
+        ImGui.SetNextWindowSize(new Vector2(Width - 20, Height - 20));
+        ImGui.Begin(open.WindowName);
+        open.PreDraw();
+        open.Draw();
+        open.PostDraw();
+        ImGui.End();
+    }
+
+    private static Configuration ConfigFor(HarnessOptions options)
+    {
+        var config = new Configuration { LastSeenVersion = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "" };
+        if (!string.IsNullOrEmpty(options.ApiSecret))
+        {
+            config.xvmApiUrl = options.ApiUrl!;
+            config.xvmApiSecret = options.ApiSecret;
+        }
+
+        return config;
+    }
+
+    private object? Record(string level, object?[] args)
+    {
+        var parts = args.Select(a => a is object?[] values ? string.Join(",", values) : a?.ToString());
+        logLines.Add($"{level}: {string.Join(" | ", parts)}");
+        return null;
+    }
+
+    private Window MainWindow() => plugin.WindowSystem.Windows.OfType<Window>().First(w => w.WindowName.Contains("Main"));
+
+    private FieldInfo CurrentTabField() => MainWindow().GetType().GetField("_currentTab", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+    private IEnumerable<object> TabList() =>
+        ((System.Collections.IEnumerable)MainWindow().GetType().GetField("tabs", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(MainWindow())!).Cast<object>();
+
+    private static string TabName(object tab) => (string)tab.GetType().GetProperty("Name")!.GetValue(tab)!;
+}
