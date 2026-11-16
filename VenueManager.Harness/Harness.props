@@ -1,0 +1,24 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+    <DalamudDir Condition="'$(DALAMUD_HOME)' != ''">$(DALAMUD_HOME)</DalamudDir>
+    <DalamudDir Condition="'$(DalamudDir)' == ''">$(HOME)/.xlcore/dalamud/Hooks/dev</DalamudDir>
+    <HarnessCache Condition="'$(AETHERPHONE_HARNESS_CACHE)' != ''">$(AETHERPHONE_HARNESS_CACHE)</HarnessCache>
+    <HarnessCache Condition="'$(HarnessCache)' == ''">$(HOME)/.aetherphone-harness</HarnessCache>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Dalamud.Bindings.ImGui">
+      <HintPath>$(DalamudDir)/Dalamud.Bindings.ImGui.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="StageCimgui" AfterTargets="Build">
+    <Copy SourceFiles="$(HarnessCache)/native/libcimgui.so" DestinationFiles="$(OutDir)cimgui.dll" Condition="Exists('$(HarnessCache)/native/libcimgui.so')" />
+  </Target>
+</Project>

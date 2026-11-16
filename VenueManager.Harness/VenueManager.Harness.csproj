@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="Harness.props" />
+  <PropertyGroup>
+    <RootNamespace>VenueManager.Harness</RootNamespace>
+  </PropertyGroup>
+</Project>
