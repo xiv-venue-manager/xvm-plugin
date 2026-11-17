@@ -39,7 +39,23 @@ public class ChangelogWindow : Window, IDisposable
 #else
     private static readonly ChangelogEntry[] Entries =
     [
-        new("v4.0.0", "November 2026", "A new way to link, and shifts you can clock into", IsCurrent: true,
+        new("v4.0.1", "November 2026", "A clearer Shifts tab, and a filter for services", IsCurrent: true,
+        [
+            "Open event shifts show the event they belong to, and the open board only lists shifts for your roles.",
+            "Shifts are grouped by date, and your own shifts sit above the open ones on the Shifts tab.",
+            "Your roles refresh with the shift poll, so a role change made on the dashboard shows up without reloading the plugin.",
+            "A filter box on the Inventory tab and inside the Sales service dropdown. It matches the service name, the linked item and the category.",
+            "Fixed the Link button leaving the rest of the window greyed out while a link was in progress.",
+        ]),
+
+        new("Known limits", "November 2026", "Not working yet", IsCurrent: false,
+        [
+            "The teleport button does not work for apartments, because Lifestream cannot be given an apartment address.",
+            "Every chamber in an FC house counts as a different house, so chambers are not saved as venues.",
+            "A patron who is still inside when the last staff member leaves stays shown as inside for a while.",
+        ]),
+
+        new("v4.0.0", "November 2026", "A new way to link, and shifts you can clock into", IsCurrent: false,
         [
             "The plugin now talks to the new XIV Venue Manager system. Link it with a one-time code from the dashboard (API Keys, Generate link code). Old API keys no longer work, so everyone needs to link again, once.",
             "Setup checklist at the top of Settings: link the account, link your current character, turn on XIV-App Sync. Your own visits are not logged until your character is linked.",
@@ -58,13 +74,6 @@ public class ChangelogWindow : Window, IDisposable
             "Chat tells you when a sale or tip is logged without a live event, and when a venue conflict is found.",
             "Greeter Free Enable ignores your shift and venue.",
             "A failed event or rooms lookup now shows as a failure instead of looking like an empty list.",
-        ]),
-
-        new("Known limits", "November 2026", "Not working yet", IsCurrent: false,
-        [
-            "The teleport button does not work for apartments, because Lifestream cannot be given an apartment address.",
-            "Every chamber in an FC house counts as a different house, so chambers are not saved as venues.",
-            "A patron who is still inside when the last staff member leaves stays shown as inside for a while.",
         ]),
 
         new("v3.11.0", "August 2026", "Exterior Plot Tracking", IsCurrent: false,
